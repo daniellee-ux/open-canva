@@ -37,11 +37,15 @@ function usedFontFamilies(board: HTMLElement): Set<string> {
 }
 
 async function inlineFontFaces(board: HTMLElement): Promise<string> {
+  const link = [...document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].find(
+    (l) => l.href.includes('fonts.googleapis.com'),
+  );
+  // Fallback @import references the FULL family set the app loads (every theme
+  // font), not a stale hardcoded subset — so even when byte-inlining fails the
+  // exported file still requests the right faces.
+  const fallback = link ? `@import url('${link.href}');` : FONT_IMPORT;
   try {
-    const link = [...document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].find(
-      (l) => l.href.includes('fonts.googleapis.com'),
-    );
-    if (!link) return FONT_IMPORT;
+    if (!link) return fallback;
     const used = usedFontFamilies(board);
     const cssText = await (await fetch(link.href)).text();
     // Keep only the @font-face blocks for families this board actually renders.
@@ -49,7 +53,7 @@ async function inlineFontFaces(board: HTMLElement): Promise<string> {
       const m = /font-family:\s*['"]?([^;'"]+)/i.exec(b);
       return m && used.has(m[1].trim().toLowerCase());
     });
-    if (!blocks.length) return FONT_IMPORT;
+    if (!blocks.length) return fallback;
     const urls = [...new Set(blocks.flatMap((b) => [...b.matchAll(/url\((https:\/\/[^)]+\.woff2)\)/g)].map((m) => m[1])))];
     const map = new Map<string, string>();
     await Promise.all(
@@ -65,7 +69,7 @@ async function inlineFontFaces(board: HTMLElement): Promise<string> {
       .map((b) => b.replace(/url\((https:\/\/[^)]+\.woff2)\)/g, (m, u) => (map.has(u) ? `url(${map.get(u)})` : m)))
       .join('\n');
   } catch {
-    return FONT_IMPORT;
+    return fallback;
   }
 }
 
@@ -104,7 +108,7 @@ async function inlineImages(root: HTMLElement): Promise<void> {
   );
 }
 
-async function buildBoardSvg(board: HTMLElement, w: number, h: number, forRaster: boolean): Promise<string> {
+async function buildBoardSvg(board: HTMLElement, w: number, h: number): Promise<string> {
   const clone = board.cloneNode(true) as HTMLElement;
   clone.style.transform = 'none';
   clone.style.margin = '0';
@@ -112,11 +116,11 @@ async function buildBoardSvg(board: HTMLElement, w: number, h: number, forRaster
   clone.style.height = `${h}px`;
   // Drop inspector/editor-only artifacts from the serialized output.
   clone.querySelectorAll('.ox-peek').forEach((el) => el.classList.remove('ox-peek'));
-  let fontCss = FONT_IMPORT;
-  if (forRaster) {
-    await inlineImages(clone);
-    fontCss = await inlineFontFaces(board);
-  }
+  // Inline images + fonts for EVERY format: a raster needs it to avoid canvas
+  // taint, and a standalone .svg needs it to stay faithful once it leaves the dev
+  // origin (relative <img> would 404; un-inlined theme fonts would fall back).
+  await inlineImages(clone);
+  const fontCss = await inlineFontFaces(board);
   const css = `${fontCss}${RESET}${boardCss}`;
   const xhtml = new XMLSerializer().serializeToString(clone);
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
@@ -128,13 +132,13 @@ async function buildBoardSvg(board: HTMLElement, w: number, h: number, forRaster
 
 export async function exportSvg(board: HTMLElement, w: number, h: number, filename: string) {
   await (document as any).fonts?.ready;
-  const svg = await buildBoardSvg(board, w, h, false);
+  const svg = await buildBoardSvg(board, w, h);
   download(`${filename}.svg`, new Blob([svg], { type: 'image/svg+xml' }));
 }
 
 async function rasterize(board: HTMLElement, w: number, h: number, scale: number): Promise<Blob> {
   await (document as any).fonts?.ready;
-  const svg = await buildBoardSvg(board, w, h, true);
+  const svg = await buildBoardSvg(board, w, h);
   const svgUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   const img = new Image();
   img.decoding = 'sync';
