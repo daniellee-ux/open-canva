@@ -7,7 +7,8 @@
  *   - overflow      a child's content spills past the box that contains it
  *   - invisible     text whose colour ~matches the surface behind it (<1.8:1)
  *   - occluded      a higher OPAQUE shape covers the real glyphs of a text line
- *                   (measured per rendered line, so a clipped tail word counts)
+ *                   (measured per rendered line, so a clipped tail word counts),
+ *                   or a LINE rule largely hidden behind opaque shapes (dead rule)
  *   - crowding      a text/figure jammed against the inner edge of a much larger
  *                   container box, with no breathing room (e.g. card-footer text
  *                   touching the card border, a subhead riding the band edge)
@@ -225,6 +226,23 @@ export function findLayoutIssues(root: ParentNode = document): LayoutIssue[] {
         // 5) off-canvas
         const out = Math.max(br.left - r.left, br.top - r.top, r.right - br.right, r.bottom - br.bottom) / zoom;
         if (out > 8) issues.push({ kind: 'off-canvas', severity: 'medium', type, label, detail: `extends ${Math.round(out)}px beyond the artboard` });
+      }
+
+      // 3b) a LINE largely hidden behind opaque shapes — a dead rule (e.g. a
+      //     "connector" placed at the card tops that the cards paint right over).
+      //     Lines are never offset-shadows, so this stays clean where a box-vs-box
+      //     cover check would drown in intentional shadow/overlap false positives.
+      if (type === 'line' && !rotated(el) && (r.width >= 8 || r.height >= 8)) {
+        const horiz = r.width >= r.height;
+        const n = 24;
+        let cov = 0;
+        for (let i = 0; i < n; i++) {
+          const x = horiz ? r.left + (r.width * (i + 0.5)) / n : r.left + r.width / 2;
+          const y = horiz ? r.top + r.height / 2 : r.top + (r.height * (i + 0.5)) / n;
+          if (coveredAt(el, x, y)) cov++;
+        }
+        if (cov / n > 0.7)
+          issues.push({ kind: 'occluded', severity: 'medium', type, label, detail: `line is ${Math.round((cov / n) * 100)}% hidden behind other shapes — not visible` });
       }
 
       // 6) crowding — text/figure jammed against the inner edge of a MUCH LARGER
