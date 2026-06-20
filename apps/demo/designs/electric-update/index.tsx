@@ -49,8 +49,9 @@ const Main: Scene = () => (
       Faster build pipelines
     </Text>
 
-    {/* divider between stat and quote */}
-    <Line x={912} y={612} w={400} thickness={2} color="#8ea0f5" rotate={90} z={3} />
+    {/* divider between stat and quote — rotate(90) pivots about center, so the
+        rendered vertical bar sits at (x + w/2, y + thickness/2) = (924, 725) */}
+    <Line x={774} y={724} w={300} thickness={2} color="#8ea0f5" rotate={90} z={3} />
 
     {/* hero quote */}
     <Text x={968} y={596} w={820} size={48} weight={500} color="var(--ox-light, #ffffff)" font="body" lineHeight={1.28} z={3}>
