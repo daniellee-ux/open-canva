@@ -7,6 +7,12 @@
   overflow: hidden;
   font-family: var(--ox-font-body);
   color: var(--ox-fg);
+  /* Pin the board's base typography to the export baseline (16px / normal /
+     normal) so designs render identically in the editor and in PNG/SVG/PDF,
+     insulated from editor-chrome styles inherited from the page body element. */
+  font-size: 16px;
+  line-height: normal;
+  letter-spacing: normal;
 }
 
 .ox-obj {
@@ -24,6 +30,6 @@
 
 /* Editor-only peek highlight (stripped before export). */
 .ox-peek {
-  outline: 2px solid #4f8cff !important;
+  outline: 2px solid #5a9bf0 !important;
   outline-offset: 1px;
 }

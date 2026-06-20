@@ -4,3 +4,8 @@ dist/
 .claude/
 *.log
 .DS_Store
+
+# Design workspace is local-only in the open-source repo — only the starter guide
+# ships. Add your own designs under apps/demo/designs/; they stay on your machine.
+apps/demo/designs/*
+!apps/demo/designs/start-here/

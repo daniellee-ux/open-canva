@@ -96,6 +96,18 @@ Display fonts here (**Archivo Black, Fraunces, Playfair Display, Bodoni Moda, Po
 - **Big numbers/stats** (`30%`, `99.99%`, `10×`) are single wide "words" — give their box plenty of width.
 - **Verify by eye.** Open `/d/<id>`; confirm no headline wraps unintentionally, nothing breaks mid-word, and no two text blocks overlap.
 
+## Layout integrity — get it right up front
+
+A dev-time layout lint measures the **rendered** result (real fonts, colours, stacking, wrapping — not the declared x/y/w/h) and flags these defect classes. Author so none occur; don't lean on fixing them afterward. **Check it:** open `/d/<id>` — the console logs `0 layout issue(s)` when clean, or names each — or call `window.__ox.lint()`.
+
+- **Stacking — text on a box needs a higher `z`, or just nest it.** The single most common trap: a `<Text>` with no `z` (defaults to 0) placed over a `<Box>`/`<Ellipse>` that *has* a `z` → the opaque box paints over its own label and the text disappears. **Preferred fix: nest the `<Text>` inside the `<Box>`** (children always paint above their parent); otherwise give the text a `z` greater than the box's. *(lint: invisible / occluded)*
+- **Don't run text under an opaque neighbour.** A headline whose tail slides under an adjacent card, or a word a circular badge cuts into, gets clipped — even two hidden letters read as broken. Size and place text so its glyphs clear opaque siblings: shrink the headline, narrow its `w`, or move the shape. *(lint: occluded)*
+- **Leave breathing room — never sit flush against a border, rule, or edge.** Keep ≳ 0.4em (≈16–24px) between any text/figure and its container's border, a divider line, an adjacent block, or the artboard edge. Card-footer text clears the card bottom; a subhead clears its band's bottom edge; a CTA clears the artboard edge; a title or number never jams against a badge. If badge + title + body + gaps don't fit a card, the card is too short or the copy too long — resize or trim, don't cram. *(lint: crowding)*
+- **Every rule must be visible.** Don't place a `<Line>` where boxes/cards will paint over it (a "connector" run along the card tops just vanishes behind the cards). Dividers belong in open space. *(lint: occluded line)*
+- **Contrast against the surface *actually behind* the text, not the artboard `--ox-bg`.** Text on a coloured card or band must contrast *that* colour (≥ ~3:1). Watch `var(--ox-fg)` on `var(--ox-accent)`, white on a pale tint, or a tinted eyebrow sitting on its own block. *(lint: invisible)*
+
+A clean lint is part of "done."
+
 ### Multiple files are fine
 
 Split scenes into sibling files imported by `index.tsx`:
@@ -116,3 +128,4 @@ The inspector resolves click-to-source across these files correctly (it reads in
 4. `meta.createdAt` is a real quoted ISO string (from `node -e`).
 5. There is a clear focal point and the composition stays within the artboard.
 6. Opened the design in the browser (`/d/<id>`) and it looks right at the fitted zoom.
+7. The layout lint is clean — `window.__ox.lint()` returns `[]` (console shows `0 layout issue(s)`): no invisible, occluded, crowded, hidden-rule, or off-canvas objects.

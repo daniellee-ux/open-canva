@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { type CanvaSource, findCanvaSource } from '../lib/fiber';
+import { Icon } from './icons';
 
 /**
  * Click-to-source inspector for the canvas. Resolves the clicked object via its
@@ -154,6 +155,8 @@ export function Inspector({
   const commentEls = useRef<{ text: string; el: HTMLElement }[]>([]);
   const [text, setText] = useState('');
   const [comment, setComment] = useState('');
+  const commentRef = useRef('');
+  commentRef.current = comment; // read latest comment without making it an effect dep
   const [toast, setToast] = useState<Toast | null>(null);
 
   const zoomRef = useRef(zoom);
@@ -227,13 +230,31 @@ export function Inspector({
     fetch(`/__ox/comments?design=${encodeURIComponent(designId)}`)
       .then((r) => r.json())
       .then((d) => {
-        if (alive) resolveComments(d.comments ?? []);
+        if (!alive) return;
+        resolveComments(d.comments ?? []);
+        // Comments arrive async; if the panel is already open on a commented
+        // object and the user hasn't started typing, surface the stored text.
+        const s = selRef.current;
+        if (s && !commentRef.current) {
+          const hit = commentEls.current.find((c) => c.el === s.el);
+          if (hit) setComment(hit.text);
+        }
       })
       .catch(() => {});
     return () => {
       alive = false;
     };
   }, [active, designId, revision, commentNonce, resolveComments]);
+
+  // An object's existing agent comment, resolved from /__ox/comments. The marker
+  // lives in source — a primitive drops a written data-ox-comment prop so it never
+  // reaches the DOM, so commentEls (the resolved endpoint data) is the source of
+  // truth; getAttribute is only a fallback for raw host nodes.
+  const existingCommentFor = useCallback((el: HTMLElement): string => {
+    const hit = commentEls.current.find((c) => c.el === el);
+    if (hit) return hit.text;
+    return el.getAttribute('data-ox-comment') ?? '';
+  }, []);
 
   const select = useCallback(
     (el: HTMLElement) => {
@@ -247,10 +268,10 @@ export function Inspector({
       setHovRect(null);
       setHovBox(null);
       setText((el.textContent ?? '').replace(/\s+/g, ' ').trim());
-      setComment('');
+      setComment(existingCommentFor(el)); // pre-fill so a left comment is viewable
       onSelectionChange?.(src);
     },
-    [onSelectionChange],
+    [onSelectionChange, existingCommentFor],
   );
 
   const deselect = useCallback(() => {
@@ -620,6 +641,21 @@ export function Inspector({
   // Resolve swatch colors against the SELECTED OBJECT (inside the themed board),
   // since the popover sits outside any [data-ox-board] where the --ox-* vars are unset.
   const swatchColors = sel ? SWATCHES.map((s) => ({ ...s, color: resolveVar(sel.el, s.key) })) : [];
+  const norm = (c: string) => c.trim().toLowerCase();
+  // A non-text object filled with a gradient/transparent has no single color
+  // (computed backgroundColor reads rgba(0,0,0,0)) — don't pretend it's #000000.
+  const fillIndeterminate =
+    !!sel &&
+    fillProp === 'fill' &&
+    (() => {
+      const cs = getComputedStyle(sel.el);
+      return cs.backgroundImage !== 'none' || /,\s*0\)\s*$/.test(cs.backgroundColor);
+    })();
+  // First preset swatch matching the current color (first-match only, so a color
+  // shared by two tokens still highlights a single swatch). -1 = none / custom.
+  const selectedSwatchIdx =
+    !sel || fillIndeterminate ? -1 : swatchColors.findIndex((s) => norm(s.color) === norm(currentColor));
+  const isCustomColor = !!sel && !fillIndeterminate && selectedSwatchIdx === -1;
 
   return (
     <div className="ox-inspector-layer">
@@ -629,7 +665,7 @@ export function Inspector({
           className="ox-comment-badge"
           style={{ left: c.rect.right - 14, top: c.rect.top - 14 }}
         >
-          <span aria-hidden>💬</span>
+          <Icon name="comment" size={14} />
           <div className="ox-comment-tip">{c.text}</div>
         </div>
       ))}
@@ -681,19 +717,38 @@ export function Inspector({
             ) : null}
 
             <label className="ox-pop-label">{fillProp === 'color' ? 'Color' : 'Fill'}</label>
-            <div className="ox-pop-actions">
-              <input
-                ref={colorInputRef}
-                type="color"
-                className="ox-color"
-                defaultValue={currentColor}
-                onInput={(e) => previewColor((e.target as HTMLInputElement).value)}
-                onChange={(e) => setColor((e.target as HTMLInputElement).value)}
-              />
-              {swatchColors.map((s) => (
-                <button key={s.token} type="button" className="ox-swatch" title={s.token} style={{ background: s.color }} onClick={() => setColor(s.token)} />
-              ))}
+            <div className="ox-swatches">
+              {swatchColors.map((s, i) => {
+                const selected = i === selectedSwatchIdx;
+                return (
+                  <button
+                    key={s.token}
+                    type="button"
+                    className={`ox-swatch${selected ? ' is-selected' : ''}`}
+                    title={s.token}
+                    aria-label={`${fillProp === 'color' ? 'Text color' : 'Fill'}: ${s.token}`}
+                    aria-pressed={selected}
+                    style={{ background: s.color }}
+                    onClick={() => setColor(s.token)}
+                  />
+                );
+              })}
             </div>
+            <label className={`ox-custom${isCustomColor ? ' is-selected' : ''}`} title="Pick any color">
+              <span className="ox-custom-tile">
+                <input
+                  ref={colorInputRef}
+                  type="color"
+                  className="ox-custom-input"
+                  defaultValue={currentColor}
+                  aria-label="Custom color"
+                  onInput={(e) => previewColor((e.target as HTMLInputElement).value)}
+                  onChange={(e) => setColor((e.target as HTMLInputElement).value)}
+                />
+              </span>
+              <span className="ox-custom-text">Custom</span>
+              <code className="ox-custom-hex">{fillIndeterminate ? '—' : currentColor}</code>
+            </label>
 
             <label className="ox-pop-label">Arrange</label>
             <div className="ox-pop-actions">
@@ -706,7 +761,7 @@ export function Inspector({
             <textarea className="ox-pop-text" value={comment} placeholder="e.g. “make this headline pop more”" onChange={(e) => setComment(e.target.value)} onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') runComment(); }} />
             <div className="ox-pop-actions">
               <button type="button" className="ox-pop-btn" onClick={deselect}>Close</button>
-              <button type="button" className="ox-pop-btn" disabled={!sel.src || !comment.trim()} onClick={runComment}>Add comment</button>
+              <button type="button" className="ox-pop-btn" disabled={!sel.src || !comment.trim()} onClick={runComment}>{existingCommentFor(sel.el) ? 'Update comment' : 'Add comment'}</button>
             </div>
           </Popover>
         </>
@@ -714,11 +769,16 @@ export function Inspector({
 
       <div className="ox-inspect-bar">
         <span className="ox-inspect-hint">Click an object · drag to move · ⌫ delete</span>
-        <button type="button" className="ox-chip" onClick={() => history('undo')}>↶ Undo</button>
-        <button type="button" className="ox-chip" onClick={() => history('redo')}>↷ Redo</button>
+        <button type="button" className="ox-chip" onClick={() => history('undo')}><Icon name="undo" size={14} /> Undo</button>
+        <button type="button" className="ox-chip" onClick={() => history('redo')}><Icon name="redo" size={14} /> Redo</button>
       </div>
 
-      {toast ? <div className={`ox-toast ox-toast--${toast.kind}`}>{toast.msg}</div> : null}
+      {toast ? (
+        <div className={`ox-toast ox-toast--${toast.kind}`} role={toast.kind === 'err' ? 'alert' : 'status'}>
+          <span className="ox-toast-glyph" aria-hidden><Icon name={toast.kind === 'err' ? 'warn' : 'check'} size={14} /></span>
+          {toast.msg}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -740,12 +800,52 @@ function sameRect(a: DOMRect, b: DOMRect): boolean {
   return a.left === b.left && a.top === b.top && a.width === b.width && a.height === b.height;
 }
 
+const PANEL_W = 296; // matches .ox-pop width (styles.css, border-box)
+const PANEL_MARGIN = 12;
+
 function Popover({ rect, children }: { rect: DOMRect; children: React.ReactNode }) {
-  const top = Math.min(Math.max(rect.top, 12), window.innerHeight - 460);
-  const right = rect.right + 16;
-  const left = right + 300 > window.innerWidth ? Math.max(12, rect.left - 312) : right;
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number }>(() => ({ top: rect.top, left: rect.right + 16 }));
+
+  const place = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const w = el.offsetWidth || PANEL_W; // border-box width
+    const h = el.offsetHeight || 0; // real content-driven height (<= 86vh)
+    // Horizontal: prefer right of the object, flip left if it would overflow the
+    // right edge, then clamp against both edges so it's never cut off.
+    let left = rect.right + 16;
+    if (left + w > vw - PANEL_MARGIN) left = rect.left - w - 16;
+    left = Math.min(Math.max(PANEL_MARGIN, left), Math.max(PANEL_MARGIN, vw - w - PANEL_MARGIN));
+    // Vertical: anchor near the object top, then clamp so the WHOLE panel stays
+    // on-screen (the old fixed -460 could go negative / clip on short windows).
+    let top = rect.top;
+    top = Math.min(Math.max(PANEL_MARGIN, top), Math.max(PANEL_MARGIN, vh - h - PANEL_MARGIN));
+    setPos((prev) => (prev.top === top && prev.left === left ? prev : { top, left }));
+  }, [rect.top, rect.left, rect.right, rect.bottom]);
+
+  // Position before paint; re-clamp as the content-driven height changes (the
+  // comment textarea grows) and on window resize.
+  useLayoutEffect(() => {
+    place();
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', place);
+      return () => window.removeEventListener('resize', place);
+    }
+    const ro = new ResizeObserver(place);
+    ro.observe(el);
+    window.addEventListener('resize', place);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', place);
+    };
+  }, [place]);
+
   return (
-    <div className="ox-pop" style={{ top, left }}>
+    <div ref={ref} className="ox-pop" style={{ top: pos.top, left: pos.left }}>
       {children}
     </div>
   );

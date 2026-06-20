@@ -4,12 +4,15 @@ import { designIds } from 'virtual:opencanva/designs';
 import { designPresets, designToCssVars, resolveDesign } from '../design';
 import type { CanvaSource } from './lib/fiber';
 import { useDesignModule } from './lib/use-design-module';
+import { useUiTheme, type UiTheme } from './lib/ui-theme';
+import { findLayoutIssues } from './lib/overflow';
 import { useViewport } from './lib/viewport';
 import { boardToPngDataUrl, exportPdf, exportPng, exportSvg } from './lib/export';
 import { Stage, layoutBoards } from './components/Stage';
 import { Inspector } from './components/Inspector';
 import { LayersPanel } from './components/LayersPanel';
 import { AssetsPanel } from './components/AssetsPanel';
+import { Icon } from './components/icons';
 
 const isDev = import.meta.env.DEV;
 
@@ -28,6 +31,25 @@ function usePath(): string {
   return path;
 }
 
+function ThemeToggle({ theme, onToggle }: { theme: UiTheme; onToggle: () => void }) {
+  const next = theme === 'dark' ? 'light' : 'dark';
+  return (
+    <button
+      type="button"
+      className="ox-icon-btn ox-theme-toggle"
+      title={`Switch to ${next} mode`}
+      aria-label={`Switch to ${next} mode`}
+      onClick={onToggle}
+    >
+      <Icon
+        name="contrast"
+        size={15}
+        style={{ transform: theme === 'dark' ? 'rotate(180deg)' : 'none', transition: 'transform var(--ui-t) var(--ui-ease)' }}
+      />
+    </button>
+  );
+}
+
 export function App() {
   const path = usePath();
   const match = /^\/d\/([^/]+)/.exec(path);
@@ -38,10 +60,14 @@ export function App() {
 }
 
 function Home() {
+  const { theme, toggle } = useUiTheme();
   return (
     <div className="ox-home">
       <div className="ox-home-inner">
-        <div className="ox-home-badge">agent-native graphic design</div>
+        <div className="ox-home-top">
+          <div className="ox-home-badge">agent-native graphic design</div>
+          <ThemeToggle theme={theme} onToggle={toggle} />
+        </div>
         <h1 className="ox-home-title">
           OpenCanva<span className="ox-dot">.</span>
         </h1>
@@ -49,7 +75,7 @@ function Home() {
           Design graphics as code. Describe it to your agent, click any object to nudge it, export to
           PNG / SVG / PDF.{' '}
           <a className="ox-home-link" href="/themes" onClick={(e) => { e.preventDefault(); navigate('/themes'); }}>
-            Themes →
+            Themes <Icon name="forward" size={13} style={{ verticalAlign: '-2px' }} />
           </a>
         </p>
         {designIds.length === 0 ? (
@@ -62,7 +88,7 @@ function Home() {
               <li key={id}>
                 <a href={`/d/${encodeURIComponent(id)}`} onClick={(e) => { e.preventDefault(); navigate(`/d/${encodeURIComponent(id)}`); }}>
                   <span className="ox-home-id">{id}</span>
-                  <span className="ox-home-arrow">→</span>
+                  <span className="ox-home-arrow"><Icon name="forward" size={16} /></span>
                 </a>
               </li>
             ))}
@@ -75,12 +101,15 @@ function Home() {
 
 function ThemesPage() {
   const names = Object.keys(designPresets);
+  const { theme, toggle } = useUiTheme();
   return (
     <div className="ox-themes">
       <header className="ox-toolbar">
-        <a className="ox-icon-btn" href="/" title="Library" onClick={(e) => { e.preventDefault(); navigate('/'); }}>←</a>
+        <a className="ox-icon-btn" href="/" title="Library" onClick={(e) => { e.preventDefault(); navigate('/'); }}><Icon name="back" /></a>
         <span className="ox-brand">OpenCanva<span className="ox-dot">.</span></span>
         <span className="ox-doc-title">Themes</span>
+        <span className="ox-spacer" />
+        <ThemeToggle theme={theme} onToggle={toggle} />
       </header>
       <div className="ox-themes-grid">
         {names.map((name) => {
@@ -111,6 +140,7 @@ function ThemesPage() {
 
 function DesignPage({ id }: { id: string }) {
   const { design: mod, error } = useDesignModule(id);
+  const { theme: uiTheme, toggle: toggleUiTheme } = useUiTheme();
   const [inspect, setInspect] = useState(false);
   const [assets, setAssets] = useState(false);
   const [activeBoard, setActiveBoard] = useState(0);
@@ -147,10 +177,34 @@ function DesignPage({ id }: { id: string }) {
     });
   }, [id, title, activeBoard, vp.zoom, inspect, selection, mod, scenes]);
 
+  // Dev layout check — warn once per load when an object's rendered content
+  // overflows its container (e.g. a caption that wrapped past its card). The
+  // inspector never compares rendered size to the declared box, so this would
+  // otherwise stay invisible. See lib/overflow.ts.
+  useEffect(() => {
+    if (!isDev || !mod) return;
+    let alive = true;
+    document.fonts.ready
+      .then(() => new Promise<void>((r) => setTimeout(r, 80)))
+      .then(() => {
+        if (!alive) return;
+        const issues = findLayoutIssues();
+        if (issues.length) {
+          console.warn(
+            `[opencanva] ${issues.length} layout issue(s) in "${id}":`,
+            issues.map((o) => `[${o.kind}] ${o.type}${o.label ? ` "${o.label}"` : ''} — ${o.detail}`),
+          );
+        }
+      });
+    return () => {
+      alive = false;
+    };
+  }, [mod, id, revision]);
+
   if (error) {
     return (
       <div className="ox-msg">
-        <a className="ox-back" href="/" onClick={(e) => { e.preventDefault(); navigate('/'); }}>← Library</a>
+        <a className="ox-back" href="/" onClick={(e) => { e.preventDefault(); navigate('/'); }}><Icon name="back" size={14} /> Library</a>
         <h2>Failed to load “{id}”</h2>
         <pre className="ox-err">{error}</pre>
       </div>
@@ -180,6 +234,8 @@ function DesignPage({ id }: { id: string }) {
         const at = layout.boards[activeBoard]?.artboard ?? layout.boards[0]?.artboard;
         return board && at ? boardToPngDataUrl(board, at.w, at.h, scale) : Promise.resolve(null);
       },
+      // Layout lint: overflow, invisible/low-contrast text, occlusion, overlap, off-canvas.
+      lint: () => findLayoutIssues(),
     };
   }
 
@@ -188,17 +244,19 @@ function DesignPage({ id }: { id: string }) {
       {showUi && (
         <header className="ox-toolbar">
           {config.build.showDesignBrowser && (
-            <a className="ox-icon-btn" href="/" title="Library" onClick={(e) => { e.preventDefault(); navigate('/'); }}>←</a>
+            <a className="ox-icon-btn" href="/" title="Library" onClick={(e) => { e.preventDefault(); navigate('/'); }}><Icon name="back" /></a>
           )}
           <span className="ox-brand">OpenCanva<span className="ox-dot">.</span></span>
           <span className="ox-doc-title">{title}</span>
 
           <span className="ox-spacer" />
 
+          <ThemeToggle theme={uiTheme} onToggle={toggleUiTheme} />
+
           <div className="ox-zoom">
-            <button type="button" className="ox-icon-btn" title="Zoom out" onClick={() => vp.zoomBy(1 / 1.2)}>−</button>
+            <button type="button" className="ox-icon-btn" title="Zoom out" onClick={() => vp.zoomBy(1 / 1.2)}><Icon name="minus" /></button>
             <button type="button" className="ox-zoom-label" title="Fit to screen" onClick={vp.fit}>{Math.round(vp.zoom * 100)}%</button>
-            <button type="button" className="ox-icon-btn" title="Zoom in" onClick={() => vp.zoomBy(1.2)}>+</button>
+            <button type="button" className="ox-icon-btn" title="Zoom in" onClick={() => vp.zoomBy(1.2)}><Icon name="plus" /></button>
           </div>
 
           {scenes.length > 1 && (
@@ -210,16 +268,16 @@ function DesignPage({ id }: { id: string }) {
           )}
 
           {isDev && (
-            <button type="button" className={`ox-btn${inspect ? ' ox-btn--active' : ''}`} onClick={() => setInspect((v) => !v)}>
+            <button type="button" className={`ox-btn${inspect ? ' ox-btn--active' : ''}`} aria-pressed={inspect} onClick={() => setInspect((v) => !v)}>
               {inspect ? 'Editing' : 'Edit'}
             </button>
           )}
           {isDev && (
-            <button type="button" className={`ox-btn${assets ? ' ox-btn--active' : ''}`} onClick={() => setAssets((v) => !v)}>Assets</button>
+            <button type="button" className={`ox-btn${assets ? ' ox-btn--active' : ''}`} aria-pressed={assets} onClick={() => setAssets((v) => !v)}>Assets</button>
           )}
 
           <div className="ox-menu">
-            <button type="button" className="ox-btn ox-btn--primary">Export ▾</button>
+            <button type="button" className="ox-btn ox-btn--primary">Export <Icon name="caret" size={14} /></button>
             <div className="ox-menu-list">
               {config.build.allowPngDownload && <button type="button" onClick={() => doExport('png')}>PNG</button>}
               {config.build.allowSvgDownload && <button type="button" onClick={() => doExport('svg')}>SVG</button>}
@@ -235,6 +293,7 @@ function DesignPage({ id }: { id: string }) {
             scenes={scenes}
             title={title}
             designKey={id}
+            activeBoard={activeBoard}
             onFocusBoard={(i) => { setActiveBoard(i); vp.fit(); }}
           />
         )}
