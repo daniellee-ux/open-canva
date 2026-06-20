@@ -1,0 +1,36 @@
+{
+  "name": "opencanva",
+  "version": "0.0.0",
+  "private": true,
+  "description": "OpenCanva — the agent-native graphic design framework. Design graphics as React components; click any object to edit; export to PNG/SVG/PDF. The canvas analog of open-slide / open-doc.",
+  "license": "Apache-2.0",
+  "author": "Daniel Lee",
+  "homepage": "https://github.com/daniellee-ux/open-canva#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/daniellee-ux/open-canva.git"
+  },
+  "bugs": {
+    "url": "https://github.com/daniellee-ux/open-canva/issues"
+  },
+  "keywords": [
+    "graphic-design",
+    "canvas",
+    "react",
+    "svg",
+    "png",
+    "agent-native",
+    "code-first",
+    "vite"
+  ],
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @opencanva/demo",
+    "build": "npm run build -w @opencanva/demo",
+    "preview": "npm run preview -w @opencanva/demo",
+    "typecheck": "npm run typecheck -w @opencanva/core"
+  }
+}
