@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { type CanvaSource, findCanvaSource } from '../lib/fiber';
 import { Icon } from './icons';
 
@@ -155,6 +155,8 @@ export function Inspector({
   const commentEls = useRef<{ text: string; el: HTMLElement }[]>([]);
   const [text, setText] = useState('');
   const [comment, setComment] = useState('');
+  const commentRef = useRef('');
+  commentRef.current = comment; // read latest comment without making it an effect dep
   const [toast, setToast] = useState<Toast | null>(null);
 
   const zoomRef = useRef(zoom);
@@ -228,13 +230,31 @@ export function Inspector({
     fetch(`/__ox/comments?design=${encodeURIComponent(designId)}`)
       .then((r) => r.json())
       .then((d) => {
-        if (alive) resolveComments(d.comments ?? []);
+        if (!alive) return;
+        resolveComments(d.comments ?? []);
+        // Comments arrive async; if the panel is already open on a commented
+        // object and the user hasn't started typing, surface the stored text.
+        const s = selRef.current;
+        if (s && !commentRef.current) {
+          const hit = commentEls.current.find((c) => c.el === s.el);
+          if (hit) setComment(hit.text);
+        }
       })
       .catch(() => {});
     return () => {
       alive = false;
     };
   }, [active, designId, revision, commentNonce, resolveComments]);
+
+  // An object's existing agent comment, resolved from /__ox/comments. The marker
+  // lives in source — a primitive drops a written data-ox-comment prop so it never
+  // reaches the DOM, so commentEls (the resolved endpoint data) is the source of
+  // truth; getAttribute is only a fallback for raw host nodes.
+  const existingCommentFor = useCallback((el: HTMLElement): string => {
+    const hit = commentEls.current.find((c) => c.el === el);
+    if (hit) return hit.text;
+    return el.getAttribute('data-ox-comment') ?? '';
+  }, []);
 
   const select = useCallback(
     (el: HTMLElement) => {
@@ -248,10 +268,10 @@ export function Inspector({
       setHovRect(null);
       setHovBox(null);
       setText((el.textContent ?? '').replace(/\s+/g, ' ').trim());
-      setComment('');
+      setComment(existingCommentFor(el)); // pre-fill so a left comment is viewable
       onSelectionChange?.(src);
     },
-    [onSelectionChange],
+    [onSelectionChange, existingCommentFor],
   );
 
   const deselect = useCallback(() => {
@@ -741,7 +761,7 @@ export function Inspector({
             <textarea className="ox-pop-text" value={comment} placeholder="e.g. “make this headline pop more”" onChange={(e) => setComment(e.target.value)} onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') runComment(); }} />
             <div className="ox-pop-actions">
               <button type="button" className="ox-pop-btn" onClick={deselect}>Close</button>
-              <button type="button" className="ox-pop-btn" disabled={!sel.src || !comment.trim()} onClick={runComment}>Add comment</button>
+              <button type="button" className="ox-pop-btn" disabled={!sel.src || !comment.trim()} onClick={runComment}>{existingCommentFor(sel.el) ? 'Update comment' : 'Add comment'}</button>
             </div>
           </Popover>
         </>
@@ -780,12 +800,52 @@ function sameRect(a: DOMRect, b: DOMRect): boolean {
   return a.left === b.left && a.top === b.top && a.width === b.width && a.height === b.height;
 }
 
+const PANEL_W = 296; // matches .ox-pop width (styles.css, border-box)
+const PANEL_MARGIN = 12;
+
 function Popover({ rect, children }: { rect: DOMRect; children: React.ReactNode }) {
-  const top = Math.min(Math.max(rect.top, 12), window.innerHeight - 460);
-  const right = rect.right + 16;
-  const left = right + 300 > window.innerWidth ? Math.max(12, rect.left - 312) : right;
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number }>(() => ({ top: rect.top, left: rect.right + 16 }));
+
+  const place = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const w = el.offsetWidth || PANEL_W; // border-box width
+    const h = el.offsetHeight || 0; // real content-driven height (<= 86vh)
+    // Horizontal: prefer right of the object, flip left if it would overflow the
+    // right edge, then clamp against both edges so it's never cut off.
+    let left = rect.right + 16;
+    if (left + w > vw - PANEL_MARGIN) left = rect.left - w - 16;
+    left = Math.min(Math.max(PANEL_MARGIN, left), Math.max(PANEL_MARGIN, vw - w - PANEL_MARGIN));
+    // Vertical: anchor near the object top, then clamp so the WHOLE panel stays
+    // on-screen (the old fixed -460 could go negative / clip on short windows).
+    let top = rect.top;
+    top = Math.min(Math.max(PANEL_MARGIN, top), Math.max(PANEL_MARGIN, vh - h - PANEL_MARGIN));
+    setPos((prev) => (prev.top === top && prev.left === left ? prev : { top, left }));
+  }, [rect.top, rect.left, rect.right, rect.bottom]);
+
+  // Position before paint; re-clamp as the content-driven height changes (the
+  // comment textarea grows) and on window resize.
+  useLayoutEffect(() => {
+    place();
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', place);
+      return () => window.removeEventListener('resize', place);
+    }
+    const ro = new ResizeObserver(place);
+    ro.observe(el);
+    window.addEventListener('resize', place);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', place);
+    };
+  }, [place]);
+
   return (
-    <div className="ox-pop" style={{ top, left }}>
+    <div ref={ref} className="ox-pop" style={{ top: pos.top, left: pos.left }}>
       {children}
     </div>
   );

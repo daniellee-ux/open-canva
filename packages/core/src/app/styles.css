@@ -662,6 +662,7 @@ code {
 
 .ox-pop {
   position: fixed;
+  z-index: 60; /* above .ox-inspect-bar (auto) and .ox-comment-badge (52) so the panel is never covered */
   width: 296px;
   max-height: 86vh;
   overflow-y: auto;
