@@ -127,11 +127,15 @@ export function findLayoutIssues(root: ParentNode = document): LayoutIssue[] {
 
       if (type === 'text' || type === 'icon') {
         // 2) invisible — text colour ~matches the surface behind it
-        const color = parseRgb(getComputedStyle(el).color);
+        const cs = getComputedStyle(el);
+        const color = parseRgb(cs.color);
         const bg = color ? surfaceBehind(el) : null;
         if (color && bg) {
           const ratio = contrast([color[0], color[1], color[2]], bg);
-          if (ratio < INVISIBLE)
+          // Large display type stays legible at lower contrast (and a soft tint is
+          // often deliberate), so relax the bar for big text to avoid false alarms.
+          const limit = parseFloat(cs.fontSize) >= 60 ? 1.4 : INVISIBLE;
+          if (ratio < limit)
             issues.push({ kind: 'invisible', severity: 'high', type, label, detail: `text contrast ${ratio.toFixed(2)}:1 — effectively invisible against its background` });
         }
 
@@ -158,7 +162,7 @@ export function findLayoutIssues(root: ParentNode = document): LayoutIssue[] {
         if (norm(texts[i]) === norm(texts[k])) continue; // layered shadow duplicate
         const hOv = Math.min(a.right, b.right) - Math.max(a.left, b.left);
         const vOv = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
-        if (hOv <= 2 || vOv <= 4) continue;
+        if (hOv <= 2 || vOv <= 8) continue;
         // The killer false positive is a big headline whose bounding box spans a
         // small badge sitting in whitespace beside it. Real text-on-text collisions
         // (a heading dropping onto the paragraph below) overlap a large fraction of
