@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { parse } from '@babel/parser';
 import type { Plugin } from 'vite';
+import { relFromAbs } from './loc-paths';
 
 /**
  * Source-location tagging — the reliable backbone of click-to-source. Parses the
@@ -25,7 +26,7 @@ export function locTagsPlugin(opts: { designsRoot: string }): Plugin {
       if (!abs.startsWith(designsRoot + path.sep)) return null;
 
       // rel from the designs parent so it round-trips with the write-back API.
-      const rel = path.relative(path.dirname(designsRoot), abs).replace(/\\/g, '/');
+      const rel = relFromAbs(designsRoot, abs);
       let ast: ReturnType<typeof parse>;
       try {
         ast = parse(code, { sourceType: 'module', plugins: ['typescript', 'jsx'] });
