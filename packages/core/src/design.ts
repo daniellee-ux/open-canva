@@ -280,7 +280,7 @@ export const designPresets: Record<string, DesignSystem> = {
   },
   // Notebook Tabs — cream editorial paper (notebook-reading).
   notebook: {
-    palette: { bg: '#2d2d2d', fg: '#1a1a1a', muted: '#8a8a8a', accent: '#c7967a', accent2: '#98d4bb', surface: '#f8f6f1' },
+    palette: { bg: '#F4EEE3', fg: '#1a1a1a', muted: '#8a8a8a', accent: '#c7967a', accent2: '#98d4bb', surface: '#f8f6f1' },
     fonts: { display: "'Bodoni Moda', Georgia, serif", body: "'DM Sans', ui-sans-serif, system-ui, sans-serif" },
     radius: 20,
   },

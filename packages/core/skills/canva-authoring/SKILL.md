@@ -98,7 +98,7 @@ Display fonts here (**Archivo Black, Fraunces, Playfair Display, Bodoni Moda, Po
 
 ## Layout integrity — get it right up front
 
-A dev-time layout lint measures the **rendered** result (real fonts, colours, stacking, wrapping — not the declared x/y/w/h) and flags five defect classes. Author so none occur; don't lean on fixing them afterward. **Check it:** open `/d/<id>` — the console logs `0 layout issue(s)` when clean, or names each — or call `window.__ox.lint()`.
+A dev-time layout lint measures the **rendered** result (real fonts, colours, stacking, wrapping — not the declared x/y/w/h) and flags these defect classes. Author so none occur; don't lean on fixing them afterward. **Check it:** open `/d/<id>` — the console logs `0 layout issue(s)` when clean, or names each — or call `window.__ox.lint()`.
 
 - **Stacking — text on a box needs a higher `z`, or just nest it.** The single most common trap: a `<Text>` with no `z` (defaults to 0) placed over a `<Box>`/`<Ellipse>` that *has* a `z` → the opaque box paints over its own label and the text disappears. **Preferred fix: nest the `<Text>` inside the `<Box>`** (children always paint above their parent); otherwise give the text a `z` greater than the box's. *(lint: invisible / occluded)*
 - **Don't run text under an opaque neighbour.** A headline whose tail slides under an adjacent card, or a word a circular badge cuts into, gets clipped — even two hidden letters read as broken. Size and place text so its glyphs clear opaque siblings: shrink the headline, narrow its `w`, or move the shape. *(lint: occluded)*
