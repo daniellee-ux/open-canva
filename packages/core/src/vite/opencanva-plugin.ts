@@ -125,7 +125,9 @@ export function opencanvaPlugin(opts: OpencanvaPluginOptions): Plugin {
       // drop UI state like the inspector selection / current zoom & pan). Bump the
       // import token via a custom event and re-import; suppress Vite's default HMR
       // by returning []. (trap #3)
-      if (ctx.file.startsWith(designsRoot + path.sep)) {
+      // ctx.file is posix-normalized by Vite; normalize designsRoot too so the
+      // prefix test holds on Windows (native `\` would never match `/`).
+      if (normalizePath(ctx.file).startsWith(normalizePath(designsRoot) + '/')) {
         ctx.server.ws.send({ type: 'custom', event: 'opencanva:design-changed', data: {} });
         return [];
       }
