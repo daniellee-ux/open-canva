@@ -6,7 +6,8 @@
  *
  *   - overflow      a child's content spills past the box that contains it
  *   - invisible     text whose colour ~matches the surface behind it (<1.8:1)
- *   - occluded      text covered by a higher OPAQUE shape (box/ellipse/image)
+ *   - occluded      a higher OPAQUE shape covers the real glyphs of a text line
+ *                   (measured per rendered line, so a clipped tail word counts)
  *   - text-overlap  two different text objects whose glyphs sit on each other
  *   - off-canvas    a text object pushed past the artboard edge
  *
@@ -73,26 +74,46 @@ function isOpaqueCover(obj: HTMLElement): boolean {
   return !!rgba && rgba[3] >= 0.6;
 }
 
-/** Fraction of a text's area where the topmost painted element is a *higher,
- *  opaque, non-text* object — i.e. genuinely covering the text. Uses real
- *  hit-testing (border-radius-aware), so a circle only counts where it actually
- *  paints, and a transparent text/line sibling never counts. */
-function occludedFraction(el: HTMLElement): number {
-  const r = el.getBoundingClientRect();
-  if (r.width < 4 || r.height < 4) return 0;
-  let covered = 0;
-  let total = 0;
-  for (let i = 0; i < 6; i++)
-    for (let j = 0; j < 4; j++) {
-      const x = r.left + (r.width * (i + 0.5)) / 6;
-      const y = r.top + (r.height * (j + 0.5)) / 4;
-      const top = document.elementFromPoint(x, y) as HTMLElement | null;
-      total++;
-      if (!top || top === el || el.contains(top) || top.contains(el)) continue;
-      const obj = top.closest<HTMLElement>('[data-ox-obj]');
-      if (obj && obj !== el && !el.contains(obj) && !obj.contains(el) && isOpaqueCover(obj)) covered++;
-    }
-  return total ? covered / total : 0;
+/** Does a *higher, opaque, non-ancestor* object paint at this screen point?
+ *  Real hit-testing (border-radius-aware), so a circle only counts where it
+ *  actually paints and a transparent text/line sibling never counts. */
+function coveredAt(el: HTMLElement, x: number, y: number): boolean {
+  const top = document.elementFromPoint(x, y) as HTMLElement | null;
+  if (!top || top === el || el.contains(top) || top.contains(el)) return false;
+  const obj = top.closest<HTMLElement>('[data-ox-obj]');
+  return !!obj && obj !== el && !el.contains(obj) && !obj.contains(el) && isOpaqueCover(obj);
+}
+
+/** Occlusion of a text's ACTUAL glyph runs (one rect per rendered line), not its
+ *  declared box. Returns the worst line's covered fraction and covered width in
+ *  artboard px. Measuring the real line rects is what catches a clipped word at
+ *  the end of a long headline: a tail that's a tiny slice of a wide (or multi-
+ *  line) text box but a clearly hidden chunk of real text — the bounding-box grid
+ *  diluted that below threshold and missed it. */
+function textOcclusion(el: HTMLElement, zoom: number): { frac: number; px: number } {
+  let rects: DOMRect[] = [];
+  try {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    rects = [...range.getClientRects()].filter((r) => r.width > 4 && r.height > 4);
+  } catch {
+    return { frac: 0, px: 0 };
+  }
+  if (!rects.length) {
+    const r = el.getBoundingClientRect();
+    if (r.width > 4 && r.height > 4) rects = [r];
+  }
+  let frac = 0;
+  let px = 0;
+  for (const lr of rects) {
+    const y = lr.top + lr.height / 2;
+    const n = Math.max(10, Math.min(100, Math.round(lr.width / 6)));
+    let covered = 0;
+    for (let i = 0; i < n; i++) if (coveredAt(el, lr.left + (lr.width * (i + 0.5)) / n, y)) covered++;
+    frac = Math.max(frac, covered / n);
+    px = Math.max(px, ((covered / n) * lr.width) / zoom);
+  }
+  return { frac, px };
 }
 
 const labelOf = (el: HTMLElement, type: string) =>
@@ -139,11 +160,17 @@ export function findLayoutIssues(root: ParentNode = document): LayoutIssue[] {
             issues.push({ kind: 'invisible', severity: 'high', type, label, detail: `text contrast ${ratio.toFixed(2)}:1 — effectively invisible against its background` });
         }
 
-        // 3) occlusion — covered by a higher opaque shape
+        // 3) occlusion — real glyphs (per line) covered by a higher opaque shape.
+        //    Flag on a big covered fraction OR a meaningful absolute width (~half a
+        //    character), so a clipped word at a line's leading/trailing edge is
+        //    caught even when it's a small slice of a wide or multi-line text box.
         if (!rotated(el)) {
-          const frac = occludedFraction(el);
-          if (frac >= OCCLUDED_FRAC)
-            issues.push({ kind: 'occluded', severity: frac >= 0.5 ? 'high' : 'medium', type, label, detail: `${Math.round(frac * 100)}% hidden behind another shape` });
+          const { frac, px } = textOcclusion(el, zoom);
+          // fontSize is in artboard px already — the zoom is a CSS transform, which
+          // doesn't scale computed font-size (unlike getBoundingClientRect widths).
+          const fs = parseFloat(cs.fontSize);
+          if (frac >= OCCLUDED_FRAC || px >= Math.max(40, fs * 0.5))
+            issues.push({ kind: 'occluded', severity: frac >= 0.5 || px >= 120 ? 'high' : 'medium', type, label, detail: `${Math.round(frac * 100)}% of a text line (~${Math.round(px)}px) hidden behind another shape` });
         }
 
         // 5) off-canvas
