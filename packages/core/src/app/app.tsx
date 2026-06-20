@@ -5,6 +5,7 @@ import { designPresets, designToCssVars, resolveDesign } from '../design';
 import type { CanvaSource } from './lib/fiber';
 import { useDesignModule } from './lib/use-design-module';
 import { useUiTheme, type UiTheme } from './lib/ui-theme';
+import { findOverflows } from './lib/overflow';
 import { useViewport } from './lib/viewport';
 import { boardToPngDataUrl, exportPdf, exportPng, exportSvg } from './lib/export';
 import { Stage, layoutBoards } from './components/Stage';
@@ -176,6 +177,32 @@ function DesignPage({ id }: { id: string }) {
     });
   }, [id, title, activeBoard, vp.zoom, inspect, selection, mod, scenes]);
 
+  // Dev layout check — warn once per load when an object's rendered content
+  // overflows its container (e.g. a caption that wrapped past its card). The
+  // inspector never compares rendered size to the declared box, so this would
+  // otherwise stay invisible. See lib/overflow.ts.
+  useEffect(() => {
+    if (!isDev || !mod) return;
+    let alive = true;
+    document.fonts.ready
+      .then(() => new Promise<void>((r) => setTimeout(r, 80)))
+      .then(() => {
+        if (!alive) return;
+        const issues = findOverflows();
+        if (issues.length) {
+          console.warn(
+            `[opencanva] ${issues.length} object(s) overflow their container in "${id}":`,
+            issues.map(
+              (o) => `${o.type}${o.type === 'text' && o.label ? ` "${o.label}"` : ''} +${Math.max(o.bottom, o.right)}px`,
+            ),
+          );
+        }
+      });
+    return () => {
+      alive = false;
+    };
+  }, [mod, id, revision]);
+
   if (error) {
     return (
       <div className="ox-msg">
@@ -209,6 +236,8 @@ function DesignPage({ id }: { id: string }) {
         const at = layout.boards[activeBoard]?.artboard ?? layout.boards[0]?.artboard;
         return board && at ? boardToPngDataUrl(board, at.w, at.h, scale) : Promise.resolve(null);
       },
+      // Layout check: objects whose rendered content overflows their container.
+      overflow: () => findOverflows(),
     };
   }
 
