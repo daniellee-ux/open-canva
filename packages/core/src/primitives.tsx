@@ -236,27 +236,33 @@ export interface LineProps extends ObjectProps {
 }
 
 /** A straight line / divider. Length comes from `w`; angle from `rotate`. */
-export function Line({ color, thickness = 2, dash, className, ...p }: LineProps) {
+export function Line({ color, thickness = 2, dash, h, className, ...p }: LineProps) {
+  // The line's thickness IS its height, so a vertical/corner inspector resize
+  // commits an `h` prop — honor it (h wins) instead of discarding it, which would
+  // leave a dead `h` in source and let a corner drag mis-position the line.
+  const stroke = h ?? thickness;
+  const geom = { ...p, h: stroke };
+  // Paint the stroke via `currentColor` so the inspector's live `style.color`
+  // preview (and its current-color readback) reflects the line, not inherited text.
+  const strokeColor = color ?? 'var(--ox-fg)';
   if (dash) {
     return (
       <div
-        {...objData({ ...p, h: thickness }, 'line')}
+        {...objData(geom, 'line')}
         className={cn('ox-obj ox-line', className)}
-        style={objStyle(
-          { ...p, h: thickness },
-          {
-            borderTop: `${thickness}px dashed ${color ?? 'var(--ox-fg)'}`,
-            backgroundClip: undefined,
-          },
-        )}
+        style={objStyle(geom, {
+          color: strokeColor,
+          borderTop: `${stroke}px dashed currentColor`,
+          backgroundClip: undefined,
+        })}
       />
     );
   }
   return (
     <div
-      {...objData({ ...p, h: thickness }, 'line')}
+      {...objData(geom, 'line')}
       className={cn('ox-obj ox-line', className)}
-      style={objStyle({ ...p, h: thickness }, { background: color ?? 'var(--ox-fg)' })}
+      style={objStyle(geom, { color: strokeColor, background: 'currentColor' })}
     />
   );
 }
