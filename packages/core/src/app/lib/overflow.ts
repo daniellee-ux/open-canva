@@ -8,6 +8,9 @@
  *   - invisible     text whose colour ~matches the surface behind it (<1.8:1)
  *   - occluded      a higher OPAQUE shape covers the real glyphs of a text line
  *                   (measured per rendered line, so a clipped tail word counts)
+ *   - crowding      a text/figure jammed against the inner edge of a much larger
+ *                   container box, with no breathing room (e.g. card-footer text
+ *                   touching the card border, a subhead riding the band edge)
  *   - text-overlap  two different text objects whose glyphs sit on each other
  *   - off-canvas    a text object pushed past the artboard edge
  *
@@ -17,7 +20,7 @@
  * false positives a naive geometric checker produces. Surfaced via
  * `window.__ox.lint()` and a console warning on load (see app.tsx).
  */
-export type IssueKind = 'overflow' | 'invisible' | 'occluded' | 'text-overlap' | 'off-canvas';
+export type IssueKind = 'overflow' | 'invisible' | 'occluded' | 'crowding' | 'text-overlap' | 'off-canvas';
 
 export interface LayoutIssue {
   kind: IssueKind;
@@ -30,6 +33,9 @@ export interface LayoutIssue {
 const OVERFLOW_PX = 6; // line-box-padding tolerance (artboard px)
 const INVISIBLE = 1.8; // contrast at/below this reads as effectively invisible
 const OCCLUDED_FRAC = 0.2; // covered fraction that counts as occlusion (catches partial clips)
+const CROWD_RATIO = 3; // container must exceed the element this many times on the crowded axis
+const CROWD_MIN = 4; // floor for the required breathing margin (artboard px)
+const CROWD_MAX = 10; // cap for the required breathing margin (artboard px)
 
 /* ---- colour / contrast (WCAG relative luminance) ------------------------- */
 
@@ -116,6 +122,48 @@ function textOcclusion(el: HTMLElement, zoom: number): { frac: number; px: numbe
   return { frac, px };
 }
 
+interface Box {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  width: number;
+  height: number;
+}
+
+/** Tight CONTENT rect (screen px): the union of a text's rendered line rects (so
+ *  trailing whitespace in a wide box doesn't count), else the element's bbox. */
+function contentRect(el: HTMLElement, type: string): Box {
+  if (type === 'text' || type === 'icon') {
+    try {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const rs = [...range.getClientRects()].filter((r) => r.width > 1 && r.height > 1);
+      if (rs.length) {
+        let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
+        for (const x of rs) { l = Math.min(l, x.left); t = Math.min(t, x.top); r = Math.max(r, x.right); b = Math.max(b, x.bottom); }
+        return { left: l, top: t, right: r, bottom: b, width: r - l, height: b - t };
+      }
+    } catch { /* fall through */ }
+  }
+  const r = el.getBoundingClientRect();
+  return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height };
+}
+
+/** A RECTANGULAR box that actually paints an edge (border or opaque/​image fill)
+ *  — i.e. one whose straight inner edge a crowded element visibly butts against.
+ *  Ellipses are excluded: they don't paint in their bbox corners, so bbox-edge
+ *  proximity is meaningless (an element near the corner isn't near the shape). */
+function isVisibleBox(el: HTMLElement): boolean {
+  const t = el.getAttribute('data-ox-type');
+  if (t !== 'box' && t !== 'image') return false;
+  const cs = getComputedStyle(el);
+  if (parseFloat(cs.borderTopWidth) > 0.5) return true;
+  if (cs.backgroundImage && cs.backgroundImage !== 'none') return true;
+  const rgba = parseRgb(cs.backgroundColor);
+  return !!rgba && rgba[3] >= 0.6;
+}
+
 const labelOf = (el: HTMLElement, type: string) =>
   type === 'text' || type === 'icon' ? (el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 40) || type : type;
 const rotated = (el: HTMLElement) => /rotate/.test(el.style.transform);
@@ -131,6 +179,7 @@ export function findLayoutIssues(root: ParentNode = document): LayoutIssue[] {
   root.querySelectorAll<HTMLElement>('.ox-board').forEach((board) => {
     const objs = [...board.querySelectorAll<HTMLElement>('[data-ox-obj]')];
     const br = board.getBoundingClientRect();
+    const vboxes = objs.filter(isVisibleBox);
 
     for (const el of objs) {
       const type = el.getAttribute('data-ox-type') || 'object';
@@ -176,6 +225,51 @@ export function findLayoutIssues(root: ParentNode = document): LayoutIssue[] {
         // 5) off-canvas
         const out = Math.max(br.left - r.left, br.top - r.top, r.right - br.right, r.bottom - br.bottom) / zoom;
         if (out > 8) issues.push({ kind: 'off-canvas', severity: 'medium', type, label, detail: `extends ${Math.round(out)}px beyond the artboard` });
+      }
+
+      // 6) crowding — text/figure jammed against the inner edge of a MUCH LARGER
+      //    container box. Measured against actual content (glyph rect for text) vs
+      //    the container's edge. The "much larger on the crowded axis" gate is what
+      //    keeps snug chips/pills/badges (boxes sized to their text) and centred
+      //    labels from firing — only an element pushed flat against one edge of a
+      //    container with real empty space counts. Ellipses/images are excluded as
+      //    the crowded element: they're overwhelmingly decorative dots/blobs that
+      //    intentionally kiss an edge (a jammed BOX, e.g. a pill, is the real case).
+      if ((type === 'text' || type === 'icon' || type === 'box') && !rotated(el)) {
+        const g = contentRect(el, type);
+        if (g.width > 2 && g.height > 2) {
+          let cr: DOMRect | null = null;
+          let ca = Infinity;
+          for (const b of vboxes) {
+            if (b === el) continue;
+            const r2 = b.getBoundingClientRect();
+            if (r2.left <= g.left + 2 && r2.top <= g.top + 2 && r2.right >= g.right - 2 && r2.bottom >= g.bottom - 2) {
+              const a = r2.width * r2.height;
+              if (a > g.width * g.height * 1.05 && a < ca) { cr = r2; ca = a; }
+            }
+          }
+          if (cr) {
+            const gaps: Record<string, number> = {
+              bottom: (cr.bottom - g.bottom) / zoom,
+              top: (g.top - cr.top) / zoom,
+              left: (g.left - cr.left) / zoom,
+              right: (cr.right - g.right) / zoom,
+            };
+            let side = 'bottom';
+            let min = Infinity;
+            for (const k in gaps) if (gaps[k] < min) { min = gaps[k]; side = k; }
+            const vert = side === 'top' || side === 'bottom';
+            const cExt = (vert ? cr.height : cr.width) / zoom;
+            const eExt = (vert ? g.height : g.width) / zoom;
+            const fs = parseFloat(getComputedStyle(el).fontSize);
+            const limit =
+              type === 'text' || type === 'icon'
+                ? Math.min(Math.max(0.2 * fs, CROWD_MIN), CROWD_MAX)
+                : Math.min(Math.max(0.18 * (Math.min(g.width, g.height) / zoom), CROWD_MIN), CROWD_MAX);
+            if (cExt > eExt * CROWD_RATIO && min > 0.5 && min < limit)
+              issues.push({ kind: 'crowding', severity: min < 2 ? 'high' : 'medium', type, label, detail: `sits ${Math.round(min)}px from its container's ${side} edge — no breathing room` });
+          }
+        }
       }
     }
 
