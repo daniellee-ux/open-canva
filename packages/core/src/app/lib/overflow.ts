@@ -57,16 +57,33 @@ function contrast(a: number[], b: number[]): number {
   return la > lb ? la / lb : lb / la;
 }
 
+/** An element's own CSS opacity (1 when unset/invalid). primitives.tsx applies
+ *  per-object opacity directly, so a solid fill at e.g. opacity 0.2 is see-through
+ *  and must not count as an opaque cover / surface / hard edge. */
+function elOpacity(cs: CSSStyleDeclaration): number {
+  const o = parseFloat(cs.opacity);
+  return Number.isNaN(o) ? 1 : o;
+}
+
 /** The solid surface colour painted directly behind an element, or null if it's
- *  a gradient/image (a single-colour contrast check doesn't apply there). */
+ *  a gradient/image or nothing solid is found (a single-colour contrast check
+ *  doesn't apply there). Effective alpha folds in element opacity, and a faint
+ *  layer is skipped so the real surface behind it is measured. */
 function surfaceBehind(el: HTMLElement): number[] | null {
   const r = el.getBoundingClientRect();
   const stack = document.elementsFromPoint(r.left + r.width / 2, r.top + r.height / 2) as HTMLElement[];
-  for (const e of stack.slice(stack.indexOf(el) + 1)) {
+  const i = stack.indexOf(el);
+  if (i < 0) return null; // el isn't hit at its own centre — fail safe instead of scanning layers above it
+  for (const e of stack.slice(i + 1)) {
     const cs = getComputedStyle(e);
-    if (cs.backgroundImage && cs.backgroundImage !== 'none') return null;
+    const o = elOpacity(cs);
+    if (o < 0.1) continue; // fully transparent layer — see through to what's behind
+    if (cs.backgroundImage && cs.backgroundImage !== 'none') {
+      if (o >= 0.6) return null; // opaque image/gradient — can't reduce to one colour
+      continue;
+    }
     const rgba = parseRgb(cs.backgroundColor);
-    if (rgba && rgba[3] >= 0.6) return [rgba[0], rgba[1], rgba[2]];
+    if (rgba && rgba[3] * o >= 0.6) return [rgba[0], rgba[1], rgba[2]];
   }
   return null;
 }
@@ -76,9 +93,10 @@ function isOpaqueCover(obj: HTMLElement): boolean {
   const t = obj.getAttribute('data-ox-type');
   if (t !== 'box' && t !== 'image' && t !== 'ellipse') return false; // text/line don't hide
   const cs = getComputedStyle(obj);
-  if (cs.backgroundImage && cs.backgroundImage !== 'none') return true;
+  const o = elOpacity(cs);
+  if (cs.backgroundImage && cs.backgroundImage !== 'none') return o >= 0.6;
   const rgba = parseRgb(cs.backgroundColor);
-  return !!rgba && rgba[3] >= 0.6;
+  return !!rgba && rgba[3] * o >= 0.6;
 }
 
 /** Does a *higher, opaque, non-ancestor* object paint at this screen point?
@@ -159,10 +177,12 @@ function isVisibleBox(el: HTMLElement): boolean {
   const t = el.getAttribute('data-ox-type');
   if (t !== 'box' && t !== 'image') return false;
   const cs = getComputedStyle(el);
+  const o = elOpacity(cs);
+  if (o < 0.6) return false; // too faint to read as a hard container edge
   if (parseFloat(cs.borderTopWidth) > 0.5) return true;
   if (cs.backgroundImage && cs.backgroundImage !== 'none') return true;
   const rgba = parseRgb(cs.backgroundColor);
-  return !!rgba && rgba[3] >= 0.6;
+  return !!rgba && rgba[3] * o >= 0.6;
 }
 
 const labelOf = (el: HTMLElement, type: string) =>
@@ -197,17 +217,21 @@ export function findLayoutIssues(root: ParentNode = document): LayoutIssue[] {
       }
 
       if (type === 'text' || type === 'icon') {
-        // 2) invisible — text colour ~matches the surface behind it
         const cs = getComputedStyle(el);
-        const color = parseRgb(cs.color);
-        const bg = color ? surfaceBehind(el) : null;
-        if (color && bg) {
-          const ratio = contrast([color[0], color[1], color[2]], bg);
-          // Large display type stays legible at lower contrast (and a soft tint is
-          // often deliberate), so relax the bar for big text to avoid false alarms.
-          const limit = parseFloat(cs.fontSize) >= 60 ? 1.4 : INVISIBLE;
-          if (ratio < limit)
-            issues.push({ kind: 'invisible', severity: 'high', type, label, detail: `text contrast ${ratio.toFixed(2)}:1 — effectively invisible against its background` });
+        // 2) invisible — text colour ~matches the surface behind it. Real text only:
+        //    an Icon paints via an SVG `fill` or a multicolour emoji glyph, so a
+        //    `color`-vs-surface ratio is meaningless and would false-flag.
+        if (type === 'text' && !el.querySelector('svg')) {
+          const color = parseRgb(cs.color);
+          const bg = color ? surfaceBehind(el) : null;
+          if (color && bg) {
+            const ratio = contrast([color[0], color[1], color[2]], bg);
+            // Large display type stays legible at lower contrast (and a soft tint is
+            // often deliberate), so relax the bar for big text to avoid false alarms.
+            const limit = parseFloat(cs.fontSize) >= 60 ? 1.4 : INVISIBLE;
+            if (ratio < limit)
+              issues.push({ kind: 'invisible', severity: 'high', type, label, detail: `text contrast ${ratio.toFixed(2)}:1 — effectively invisible against its background` });
+          }
         }
 
         // 3) occlusion — real glyphs (per line) covered by a higher opaque shape.
