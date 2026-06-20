@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Icon } from './icons';
 
 /**
  * Assets panel — lists files under `designs/<id>/assets/` (logos, photos,
@@ -28,8 +29,8 @@ export function AssetsPanel({ designId, onClose }: { designId: string; onClose: 
     <div className="ox-assets">
       <div className="ox-assets-head">
         <span>Assets</span>
-        <button type="button" className="ox-icon-btn" onClick={onClose}>
-          ✕
+        <button type="button" className="ox-icon-btn" onClick={onClose} aria-label="Close">
+          <Icon name="close" />
         </button>
       </div>
       {error ? <div className="ox-assets-empty">{error}</div> : null}

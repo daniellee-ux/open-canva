@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Scene } from '../../sdk';
+import { Icon, type IconName } from './icons';
 
 /**
  * Layers + boards navigator — replaces open-doc's table of contents. Lists the
@@ -15,25 +16,27 @@ interface ObjRow {
   y: number;
 }
 
-const TYPE_GLYPH: Record<string, string> = {
-  box: '▭',
-  text: 'T',
-  ellipse: '◯',
-  line: '╱',
-  image: '▣',
-  group: '⊞',
-  icon: '★',
+const TYPE_ICON: Record<string, IconName> = {
+  box: 'box',
+  text: 'text',
+  ellipse: 'ellipse',
+  line: 'line',
+  image: 'image',
+  group: 'group',
+  icon: 'spark',
 };
 
 export function LayersPanel({
   scenes,
   title,
   designKey,
+  activeBoard,
   onFocusBoard,
 }: {
   scenes: Scene[];
   title: string;
   designKey: string;
+  activeBoard: number;
   onFocusBoard: (index: number) => void;
 }) {
   const [rows, setRows] = useState<ObjRow[]>([]);
@@ -82,8 +85,8 @@ export function LayersPanel({
           <div className="ox-layers-section">Boards</div>
           <ul className="ox-layers-boards">
             {scenes.map((s, i) => (
-              <li key={s.id ?? i}>
-                <button type="button" onClick={() => onFocusBoard(i)}>
+              <li key={s.id ?? i} className={i === activeBoard ? 'is-active' : ''}>
+                <button type="button" aria-current={i === activeBoard ? 'true' : undefined} onClick={() => onFocusBoard(i)}>
                   <span className="ox-board-dot" />
                   {s.label ?? s.id ?? `Board ${i + 1}`}
                 </button>
@@ -104,7 +107,7 @@ export function LayersPanel({
             onMouseEnter={() => peek(r.el, true)}
             onMouseLeave={() => peek(r.el, false)}
           >
-            <span className="ox-layer-glyph">{TYPE_GLYPH[r.type] ?? '●'}</span>
+            <span className="ox-layer-glyph"><Icon name={TYPE_ICON[r.type] ?? 'dot'} size={14} /></span>
             <span className="ox-layer-label">{r.label}</span>
             <span className="ox-layer-pos">
               {r.x},{r.y}

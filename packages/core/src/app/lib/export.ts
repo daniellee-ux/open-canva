@@ -36,16 +36,14 @@ function usedFontFamilies(board: HTMLElement): Set<string> {
   return out;
 }
 
-async function inlineFontFaces(board: HTMLElement): Promise<string> {
+/** Inlined @font-face CSS (base64 woff2) for the families this board uses, or
+ *  null when inlining fails (no font link, no matching faces, or a fetch error). */
+async function inlineFontFaces(board: HTMLElement): Promise<string | null> {
   const link = [...document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].find(
     (l) => l.href.includes('fonts.googleapis.com'),
   );
-  // Fallback @import references the FULL family set the app loads (every theme
-  // font), not a stale hardcoded subset — so even when byte-inlining fails the
-  // exported file still requests the right faces.
-  const fallback = link ? `@import url('${link.href}');` : FONT_IMPORT;
   try {
-    if (!link) return fallback;
+    if (!link) return null;
     const used = usedFontFamilies(board);
     const cssText = await (await fetch(link.href)).text();
     // Keep only the @font-face blocks for families this board actually renders.
@@ -53,7 +51,7 @@ async function inlineFontFaces(board: HTMLElement): Promise<string> {
       const m = /font-family:\s*['"]?([^;'"]+)/i.exec(b);
       return m && used.has(m[1].trim().toLowerCase());
     });
-    if (!blocks.length) return fallback;
+    if (!blocks.length) return null;
     const urls = [...new Set(blocks.flatMap((b) => [...b.matchAll(/url\((https:\/\/[^)]+\.woff2)\)/g)].map((m) => m[1])))];
     const map = new Map<string, string>();
     await Promise.all(
@@ -69,8 +67,21 @@ async function inlineFontFaces(board: HTMLElement): Promise<string> {
       .map((b) => b.replace(/url\((https:\/\/[^)]+\.woff2)\)/g, (m, u) => (map.has(u) ? `url(${map.get(u)})` : m)))
       .join('\n');
   } catch {
-    return fallback;
+    return null;
   }
+}
+
+/**
+ * External @import of the app's full font CSS — a last resort usable ONLY by a
+ * standalone .svg opened in a browser. A rasterized <img>/canvas REFUSES to load
+ * an SVG that references external resources, so this must never be embedded for
+ * PNG/PDF (it would make the whole board fail to rasterize).
+ */
+function externalFontImport(): string {
+  const link = [...document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].find(
+    (l) => l.href.includes('fonts.googleapis.com'),
+  );
+  return link ? `@import url('${link.href}');` : FONT_IMPORT;
 }
 
 function download(filename: string, blob: Blob) {
@@ -108,7 +119,7 @@ async function inlineImages(root: HTMLElement): Promise<void> {
   );
 }
 
-async function buildBoardSvg(board: HTMLElement, w: number, h: number): Promise<string> {
+async function buildBoardSvg(board: HTMLElement, w: number, h: number, allowExternalFonts: boolean): Promise<string> {
   const clone = board.cloneNode(true) as HTMLElement;
   clone.style.transform = 'none';
   clone.style.margin = '0';
@@ -120,25 +131,32 @@ async function buildBoardSvg(board: HTMLElement, w: number, h: number): Promise<
   // taint, and a standalone .svg needs it to stay faithful once it leaves the dev
   // origin (relative <img> would 404; un-inlined theme fonts would fall back).
   await inlineImages(clone);
-  const fontCss = await inlineFontFaces(board);
+  // Inlined @font-face works for both raster and standalone SVG. When inlining
+  // fails, ONLY a standalone .svg may fall back to an external @import — a
+  // rasterized <img> refuses to load an SVG with external refs, so PNG/PDF render
+  // with system fonts rather than failing outright.
+  const inlined = await inlineFontFaces(board);
+  const fontCss = inlined ?? (allowExternalFonts ? externalFontImport() : '');
   const css = `${fontCss}${RESET}${boardCss}`;
   const xhtml = new XMLSerializer().serializeToString(clone);
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
 <foreignObject x="0" y="0" width="${w}" height="${h}">
-<div xmlns="http://www.w3.org/1999/xhtml"><style>${css}</style>${xhtml}</div>
+<div xmlns="http://www.w3.org/1999/xhtml"><style>/*<![CDATA[*/${css}/*]]>*/</style>${xhtml}</div>
 </foreignObject>
 </svg>`;
 }
 
 export async function exportSvg(board: HTMLElement, w: number, h: number, filename: string) {
   await (document as any).fonts?.ready;
-  const svg = await buildBoardSvg(board, w, h);
+  // A standalone .svg opened in a browser CAN resolve an external @import fallback.
+  const svg = await buildBoardSvg(board, w, h, true);
   download(`${filename}.svg`, new Blob([svg], { type: 'image/svg+xml' }));
 }
 
 async function rasterize(board: HTMLElement, w: number, h: number, scale: number): Promise<Blob> {
   await (document as any).fonts?.ready;
-  const svg = await buildBoardSvg(board, w, h);
+  // Raster must NOT embed an external @import — the <img> would refuse to load.
+  const svg = await buildBoardSvg(board, w, h, false);
   const svgUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   const img = new Image();
   img.decoding = 'sync';

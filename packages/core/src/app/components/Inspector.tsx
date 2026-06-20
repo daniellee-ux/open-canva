@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type CanvaSource, findCanvaSource } from '../lib/fiber';
+import { Icon } from './icons';
 
 /**
  * Click-to-source inspector for the canvas. Resolves the clicked object via its
@@ -620,6 +621,21 @@ export function Inspector({
   // Resolve swatch colors against the SELECTED OBJECT (inside the themed board),
   // since the popover sits outside any [data-ox-board] where the --ox-* vars are unset.
   const swatchColors = sel ? SWATCHES.map((s) => ({ ...s, color: resolveVar(sel.el, s.key) })) : [];
+  const norm = (c: string) => c.trim().toLowerCase();
+  // A non-text object filled with a gradient/transparent has no single color
+  // (computed backgroundColor reads rgba(0,0,0,0)) — don't pretend it's #000000.
+  const fillIndeterminate =
+    !!sel &&
+    fillProp === 'fill' &&
+    (() => {
+      const cs = getComputedStyle(sel.el);
+      return cs.backgroundImage !== 'none' || /,\s*0\)\s*$/.test(cs.backgroundColor);
+    })();
+  // First preset swatch matching the current color (first-match only, so a color
+  // shared by two tokens still highlights a single swatch). -1 = none / custom.
+  const selectedSwatchIdx =
+    !sel || fillIndeterminate ? -1 : swatchColors.findIndex((s) => norm(s.color) === norm(currentColor));
+  const isCustomColor = !!sel && !fillIndeterminate && selectedSwatchIdx === -1;
 
   return (
     <div className="ox-inspector-layer">
@@ -629,7 +645,7 @@ export function Inspector({
           className="ox-comment-badge"
           style={{ left: c.rect.right - 14, top: c.rect.top - 14 }}
         >
-          <span aria-hidden>💬</span>
+          <Icon name="comment" size={14} />
           <div className="ox-comment-tip">{c.text}</div>
         </div>
       ))}
@@ -681,19 +697,38 @@ export function Inspector({
             ) : null}
 
             <label className="ox-pop-label">{fillProp === 'color' ? 'Color' : 'Fill'}</label>
-            <div className="ox-pop-actions">
-              <input
-                ref={colorInputRef}
-                type="color"
-                className="ox-color"
-                defaultValue={currentColor}
-                onInput={(e) => previewColor((e.target as HTMLInputElement).value)}
-                onChange={(e) => setColor((e.target as HTMLInputElement).value)}
-              />
-              {swatchColors.map((s) => (
-                <button key={s.token} type="button" className="ox-swatch" title={s.token} style={{ background: s.color }} onClick={() => setColor(s.token)} />
-              ))}
+            <div className="ox-swatches">
+              {swatchColors.map((s, i) => {
+                const selected = i === selectedSwatchIdx;
+                return (
+                  <button
+                    key={s.token}
+                    type="button"
+                    className={`ox-swatch${selected ? ' is-selected' : ''}`}
+                    title={s.token}
+                    aria-label={`${fillProp === 'color' ? 'Text color' : 'Fill'}: ${s.token}`}
+                    aria-pressed={selected}
+                    style={{ background: s.color }}
+                    onClick={() => setColor(s.token)}
+                  />
+                );
+              })}
             </div>
+            <label className={`ox-custom${isCustomColor ? ' is-selected' : ''}`} title="Pick any color">
+              <span className="ox-custom-tile">
+                <input
+                  ref={colorInputRef}
+                  type="color"
+                  className="ox-custom-input"
+                  defaultValue={currentColor}
+                  aria-label="Custom color"
+                  onInput={(e) => previewColor((e.target as HTMLInputElement).value)}
+                  onChange={(e) => setColor((e.target as HTMLInputElement).value)}
+                />
+              </span>
+              <span className="ox-custom-text">Custom</span>
+              <code className="ox-custom-hex">{fillIndeterminate ? '—' : currentColor}</code>
+            </label>
 
             <label className="ox-pop-label">Arrange</label>
             <div className="ox-pop-actions">
@@ -714,11 +749,16 @@ export function Inspector({
 
       <div className="ox-inspect-bar">
         <span className="ox-inspect-hint">Click an object · drag to move · ⌫ delete</span>
-        <button type="button" className="ox-chip" onClick={() => history('undo')}>↶ Undo</button>
-        <button type="button" className="ox-chip" onClick={() => history('redo')}>↷ Redo</button>
+        <button type="button" className="ox-chip" onClick={() => history('undo')}><Icon name="undo" size={14} /> Undo</button>
+        <button type="button" className="ox-chip" onClick={() => history('redo')}><Icon name="redo" size={14} /> Redo</button>
       </div>
 
-      {toast ? <div className={`ox-toast ox-toast--${toast.kind}`}>{toast.msg}</div> : null}
+      {toast ? (
+        <div className={`ox-toast ox-toast--${toast.kind}`} role={toast.kind === 'err' ? 'alert' : 'status'}>
+          <span className="ox-toast-glyph" aria-hidden><Icon name={toast.kind === 'err' ? 'warn' : 'check'} size={14} /></span>
+          {toast.msg}
+        </div>
+      ) : null}
     </div>
   );
 }
