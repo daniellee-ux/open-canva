@@ -1,0 +1,29 @@
+/* Board styles — kept minimal because object primitives are inline-styled.
+   This file is ALSO embedded into SVG/PNG/PDF exports, so it must contain only
+   rules safe to render headless (no editor chrome). */
+
+.ox-board {
+  position: relative;
+  overflow: hidden;
+  font-family: var(--ox-font-body);
+  color: var(--ox-fg);
+}
+
+.ox-obj {
+  box-sizing: border-box;
+}
+
+.ox-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ox-image img {
+  user-select: none;
+}
+
+/* Editor-only peek highlight (stripped before export). */
+.ox-peek {
+  outline: 2px solid #4f8cff !important;
+  outline-offset: 1px;
+}
