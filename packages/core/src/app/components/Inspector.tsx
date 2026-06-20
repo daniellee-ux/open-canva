@@ -63,6 +63,27 @@ function readGeom(el: HTMLElement): Geom {
   };
 }
 
+/**
+ * Geometry the element is ACTUALLY rendering right now: the inline style (which a
+ * gesture mutates live) wins over the data-ox-* attributes (which React only
+ * rewrites on the next commit/HMR). Without this the selection frame reads a live
+ * center from getBoundingClientRect but a stale size/angle from the attributes, so
+ * the frame and handles freeze at the pre-drag dimensions during resize/rotate.
+ */
+function readGeomLive(el: HTMLElement): Geom {
+  const g = readGeom(el);
+  const num = (v: string) => (v ? Number.parseFloat(v) : Number.NaN);
+  const sw = num(el.style.width);
+  const sh = num(el.style.height);
+  const rot = /rotate\(([-\d.]+)deg\)/.exec(el.style.transform || '');
+  return {
+    ...g,
+    w: Number.isFinite(sw) ? sw : g.w,
+    h: Number.isFinite(sh) ? sh : g.h,
+    rotate: rot ? Number(rot[1]) : g.rotate,
+  };
+}
+
 /** Theme swatches: the source TOKEN to write, plus the CSS var to read for display. */
 const SWATCHES: { token: string; key: string }[] = [
   { token: 'var(--ox-accent)', key: '--ox-accent' },
@@ -97,7 +118,9 @@ type SelBox = { cx: number; cy: number; w: number; h: number; rotate: number };
 
 function boxOf(el: HTMLElement, zoom: number): { rect: DOMRect; box: SelBox } {
   const rect = el.getBoundingClientRect();
-  const g = readGeom(el);
+  // Live geometry (inline style), so the frame tracks the object DURING a
+  // resize/rotate gesture instead of freezing at the pre-drag size/angle.
+  const g = readGeomLive(el);
   // rotation pivots about the object's center, so the AABB center IS the center.
   return {
     rect,
@@ -125,6 +148,7 @@ export function Inspector({
   const [selRect, setSelRect] = useState<DOMRect | null>(null);
   const [selBox, setSelBox] = useState<SelBox | null>(null);
   const [hovRect, setHovRect] = useState<DOMRect | null>(null);
+  const [hovBox, setHovBox] = useState<SelBox | null>(null);
   const [commentRects, setCommentRects] = useState<{ text: string; rect: DOMRect }[]>([]);
   const [commentNonce, setCommentNonce] = useState(0);
   const commentEls = useRef<{ text: string; el: HTMLElement }[]>([]);
@@ -221,6 +245,7 @@ export function Inspector({
       setSelRect(rect);
       setSelBox(box);
       setHovRect(null);
+      setHovBox(null);
       setText((el.textContent ?? '').replace(/\s+/g, ' ').trim());
       setComment('');
       onSelectionChange?.(src);
@@ -358,6 +383,7 @@ export function Inspector({
     if (!active) {
       deselect();
       setHovRect(null);
+      setHovBox(null);
       return;
     }
     const canvas = document.querySelector<HTMLElement>('.ox-canvas');
@@ -366,8 +392,14 @@ export function Inspector({
     const onMove = (e: MouseEvent) => {
       if (gesture.current) return;
       const el = (e.target as HTMLElement | null)?.closest<HTMLElement>(OBJ);
-      if (!el || !canvas.contains(el)) return setHovRect(null);
-      setHovRect(el.getBoundingClientRect());
+      if (!el || !canvas.contains(el)) {
+        setHovRect(null);
+        setHovBox(null);
+        return;
+      }
+      const { rect, box } = boxOf(el, zoomRef.current || 1);
+      setHovRect(rect);
+      setHovBox(box);
     };
     const onDown = (e: PointerEvent) => {
       if (e.button !== 0 || e.altKey) return; // alt/space/middle reserved for panning
@@ -602,8 +634,18 @@ export function Inspector({
         </div>
       ))}
 
-      {hovRect && (!selRect || !sameRect(hovRect, selRect)) ? (
-        <div className="ox-frame ox-frame--hover" style={{ left: hovRect.left, top: hovRect.top, width: hovRect.width, height: hovRect.height }} />
+      {hovBox && hovRect && (!selRect || !sameRect(hovRect, selRect)) ? (
+        <div
+          className="ox-frame ox-frame--hover"
+          style={{
+            left: hovBox.cx - hovBox.w / 2,
+            top: hovBox.cy - hovBox.h / 2,
+            width: hovBox.w,
+            height: hovBox.h,
+            transform: `rotate(${hovBox.rotate}deg)`,
+            transformOrigin: 'center',
+          }}
+        />
       ) : null}
 
       {sel && selRect && frameStyle ? (
