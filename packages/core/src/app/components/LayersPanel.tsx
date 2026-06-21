@@ -35,7 +35,6 @@ const TYPE_ICON: Record<string, IconName> = {
 
 export function LayersPanel({
   scenes,
-  title,
   designKey,
   activeBoard,
   onFocusBoard,
@@ -43,7 +42,6 @@ export function LayersPanel({
   moduleArtboard,
 }: {
   scenes: Scene[];
-  title: string;
   designKey: string;
   activeBoard: number;
   onFocusBoard: (index: number) => void;
@@ -102,8 +100,6 @@ export function LayersPanel({
 
   return (
     <aside className="ox-layers">
-      <div className="ox-layers-title">{title}</div>
-
       {scenes.length > 1 ? (
         <>
           <div className="ox-layers-section">Boards</div>

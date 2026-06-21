@@ -9,7 +9,7 @@ import { deleteDesign, duplicateDesign, renameDesign } from '../lib/design-crud'
 import { assignDesign, createFolder, deleteFolder, type FoldersManifest, useFolders } from '../lib/folders';
 import { ThumbBoard } from './ThumbBoard';
 import { Dialog } from './ui/Dialog';
-import { Menu } from './ui/Menu';
+import { Menu, SelectMenu } from './ui/Menu';
 import { toast } from './ui/toast';
 import { Icon, type IconName } from './icons';
 
@@ -159,6 +159,7 @@ function Sidebar({ selected }: { selected: WsRoute }) {
               type="button"
               className="ox-ws-folder-del"
               title="Delete folder"
+              aria-label={`Delete folder ${f.name}`}
               onClick={async () => {
                 try {
                   await deleteFolder(f.id);
@@ -169,7 +170,7 @@ function Sidebar({ selected }: { selected: WsRoute }) {
                 }
               }}
             >
-              <Icon name="close" size={12} />
+              <Icon name="trash" size={15} />
             </button>
           </div>
         ))}
@@ -514,18 +515,13 @@ export function Home() {
         </div>
         {total > 0 ? (
           <div className="ox-ws-head-controls">
-            <select
-              className="ox-board-select"
+            <SelectMenu
+              label="Sort designs"
+              align="end"
               value={sortKey}
-              onChange={(e) => setSortKey(e.target.value as SortKey)}
-              aria-label="Sort designs"
-            >
-              {SORT_KEYS.map((k) => (
-                <option key={k} value={k}>
-                  {SORT_LABELS[k]}
-                </option>
-              ))}
-            </select>
+              options={SORT_KEYS.map((k) => ({ value: k, label: SORT_LABELS[k] }))}
+              onChange={setSortKey}
+            />
             <SearchInput value={query} onChange={setQuery} />
           </div>
         ) : null}

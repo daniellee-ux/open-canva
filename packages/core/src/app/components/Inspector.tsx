@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { type CanvaSource, findCanvaSource } from '../lib/fiber';
 import { Icon } from './icons';
 import { AssetPicker } from './ui/AssetPicker';
+import { SelectMenu } from './ui/Menu';
 import { toast } from './ui/toast';
 
 /**
@@ -1365,15 +1366,13 @@ export function Inspector({
                       <>
                         <label className="ox-pop-label">Weight &amp; style</label>
                         <div className="ox-pop-row">
-                          <select
-                            className="ox-pop-select"
+                          <SelectMenu
+                            label="Font weight"
+                            align="start"
                             value={ts.weight}
-                            onChange={(e) => editType('weight', Number(e.target.value), { 'font-weight': e.target.value })}
-                          >
-                            {WEIGHTS.map((w) => (
-                              <option key={w.v} value={w.v}>{w.label}</option>
-                            ))}
-                          </select>
+                            options={WEIGHTS.map((w) => ({ value: w.v, label: w.label }))}
+                            onChange={(v) => editType('weight', v, { 'font-weight': String(v) })}
+                          />
                           <div className="ox-seg">
                             <button
                               type="button"

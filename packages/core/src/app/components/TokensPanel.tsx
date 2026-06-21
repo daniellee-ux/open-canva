@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { DesignSystem } from '../../design';
 import { putTokens, resetTokens } from '../lib/design-crud';
 import { toast } from './ui/toast';
+import { SelectMenu } from './ui/Menu';
 import { Icon } from './icons';
 
 /**
@@ -102,18 +103,26 @@ export function TokensPanel({ designId, design, onClose }: { designId: string; d
         ))}
 
         <div className="ox-tokens-label">Type</div>
-        <label className="ox-token-row2">
+        <div className="ox-token-row2">
           <span>Display</span>
-          <select className="ox-board-select" value={fontMatch(draft.fonts.display)} onChange={(e) => setFont('display', e.target.value)}>
-            {FONT_PRESETS.map((f) => <option key={f} value={f}>{fontName(f)}</option>)}
-          </select>
-        </label>
-        <label className="ox-token-row2">
+          <SelectMenu
+            label="Display font"
+            align="end"
+            value={fontMatch(draft.fonts.display)}
+            options={FONT_PRESETS.map((f) => ({ value: f, label: fontName(f) }))}
+            onChange={(v) => setFont('display', v)}
+          />
+        </div>
+        <div className="ox-token-row2">
           <span>Body</span>
-          <select className="ox-board-select" value={fontMatch(draft.fonts.body)} onChange={(e) => setFont('body', e.target.value)}>
-            {FONT_PRESETS.map((f) => <option key={f} value={f}>{fontName(f)}</option>)}
-          </select>
-        </label>
+          <SelectMenu
+            label="Body font"
+            align="end"
+            value={fontMatch(draft.fonts.body)}
+            options={FONT_PRESETS.map((f) => ({ value: f, label: fontName(f) }))}
+            onChange={(v) => setFont('body', v)}
+          />
+        </div>
 
         <div className="ox-tokens-label">Shape</div>
         <label className="ox-token-row2">

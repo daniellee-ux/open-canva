@@ -13,7 +13,7 @@ export type IconName =
   | 'search' | 'grid' | 'palette'
   | 'alignLeft' | 'alignCenter' | 'alignRight' | 'italic' | 'plug'
   | 'alignTop' | 'alignMiddle' | 'alignBottom' | 'distH' | 'distV'
-  | 'folder' | 'sliders';
+  | 'folder' | 'sliders' | 'trash';
 
 const FILL: CSSProperties = { fill: 'currentColor', stroke: 'none' };
 
@@ -53,9 +53,15 @@ const PATHS: Record<IconName, ReactNode> = {
   distV: <><path d="M4 4h16" /><path d="M4 20h16" /><path d="M8 11h8" /></>,
   folder: <path d="M3.5 7.5a1.5 1.5 0 0 1 1.5-1.5h3.8l1.7 1.8H19a1.5 1.5 0 0 1 1.5 1.5v7.7A1.5 1.5 0 0 1 19 18.5H5a1.5 1.5 0 0 1-1.5-1.5z" />,
   sliders: <><path d="M5 6h14M5 12h14M5 18h14" /><circle cx="9" cy="6" r="2" style={FILL} /><circle cx="15" cy="12" r="2" style={FILL} /><circle cx="8" cy="18" r="2" style={FILL} /></>,
+  trash: <path d="M5 7h14M10 7V5h4v2M6 7l.9 12.1a1 1 0 0 0 1 .9h8.2a1 1 0 0 0 1-.9L18 7M10 11v5M14 11v5" />,
 };
 
-export function Icon({ name, size = 16, style }: { name: IconName; size?: number; style?: CSSProperties }) {
+export function Icon({
+  name,
+  size = 16,
+  style,
+  className,
+}: { name: IconName; size?: number; style?: CSSProperties; className?: string }) {
   return (
     <svg
       width={size}
@@ -67,6 +73,7 @@ export function Icon({ name, size = 16, style }: { name: IconName; size?: number
       strokeLinecap="round"
       strokeLinejoin="round"
       style={style}
+      className={className}
       aria-hidden="true"
     >
       {PATHS[name]}

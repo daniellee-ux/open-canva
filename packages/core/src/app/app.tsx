@@ -17,6 +17,7 @@ import { AssetsPanel } from './components/AssetsPanel';
 import { TokensPanel } from './components/TokensPanel';
 import { Home, ThemesPage, ThemeDetail, ThemeToggle } from './components/Workspace';
 import { ToastHost, toast } from './components/ui/toast';
+import { Menu, SelectMenu } from './components/ui/Menu';
 import { Icon } from './components/icons';
 
 const isDev = import.meta.env.DEV;
@@ -45,11 +46,15 @@ function AgentBadge() {
   const connected = useAgentSocketConnected();
   return (
     <span
-      className={`ox-agent${connected ? ' is-live' : ''}`}
-      title={connected ? 'Agent dev link connected — edits sync live' : 'Reconnecting to the dev server…'}
+      className={`ox-agent${connected ? ' is-live' : ' is-offline'}`}
+      title={
+        connected
+          ? 'Live sync is on. Edits you or the agent make to the source files appear on the canvas instantly.'
+          : 'Live sync lost, reconnecting. Source edits will not appear on the canvas until the dev server is back.'
+      }
     >
       <span className="ox-agent-dot" />
-      {connected ? 'Live' : 'Offline'}
+      {connected ? 'Live sync' : 'Sync lost'}
     </span>
   );
 }
@@ -214,12 +219,12 @@ function DesignPage({ id }: { id: string }) {
           </div>
 
           {scenes.length > 1 && (
-            <select className="ox-board-select" value={activeBoard} onChange={(e) => setActiveBoard(Number(e.target.value))}>
-              {scenes.map((s, i) => (
-                // Index-suffixed: a duplicated board shares its source component's id.
-                <option key={`${s.id ?? 'scene'}-${i}`} value={i}>{s.label ?? s.id ?? `Board ${i + 1}`}</option>
-              ))}
-            </select>
+            <SelectMenu
+              label="Active board"
+              value={activeBoard}
+              options={scenes.map((s, i) => ({ value: i, label: s.label ?? s.id ?? `Board ${i + 1}` }))}
+              onChange={setActiveBoard}
+            />
           )}
 
           {isDev && (
@@ -234,16 +239,17 @@ function DesignPage({ id }: { id: string }) {
             <button type="button" className={`ox-btn${tokens ? ' ox-btn--active' : ''}`} aria-pressed={tokens} onClick={() => { setTokens((v) => !v); setAssets(false); }}>Tokens</button>
           )}
 
-          <div className="ox-menu">
-            <button type="button" className="ox-btn ox-btn--primary" aria-busy={!!exporting}>
-              {exporting ? `Exporting ${exporting.toUpperCase()}…` : <>Export <Icon name="caret" size={14} /></>}
-            </button>
-            <div className="ox-menu-list">
-              {config.build.allowPngDownload && <button type="button" disabled={!!exporting} onClick={() => doExport('png')}>PNG</button>}
-              {config.build.allowSvgDownload && <button type="button" disabled={!!exporting} onClick={() => doExport('svg')}>SVG</button>}
-              {config.build.allowPdfDownload && <button type="button" disabled={!!exporting} onClick={() => doExport('pdf')}>PDF</button>}
-            </div>
-          </div>
+          <Menu
+            label="Export"
+            align="end"
+            triggerClassName="ox-btn ox-btn--primary"
+            button={exporting ? `Exporting ${exporting.toUpperCase()}…` : <>Export <Icon name="caret" size={14} /></>}
+            items={[
+              ...(config.build.allowPngDownload ? [{ label: 'PNG', disabled: !!exporting, onSelect: () => doExport('png') }] : []),
+              ...(config.build.allowSvgDownload ? [{ label: 'SVG', disabled: !!exporting, onSelect: () => doExport('svg') }] : []),
+              ...(config.build.allowPdfDownload ? [{ label: 'PDF', disabled: !!exporting, onSelect: () => doExport('pdf') }] : []),
+            ]}
+          />
         </header>
       )}
 
@@ -251,7 +257,6 @@ function DesignPage({ id }: { id: string }) {
         {showUi && (
           <LayersPanel
             scenes={scenes}
-            title={title}
             designKey={id}
             activeBoard={activeBoard}
             onFocusBoard={(i) => { setActiveBoard(i); vp.fit(); }}
