@@ -26,6 +26,8 @@ Kebab-case, short, descriptive: `summer-sale`, `launch-poster`, `quote-card`. Ch
 
 Before writing, sketch the layout in words: the focal element, the supporting text, the accents/decoration, and roughly where each sits on the artboard (top band, centered headline, bottom CTA…). Decide the visual hierarchy — one element should dominate.
 
+Also decide the **logical structure**: which objects form self-contained units (a card, a stat, a header cluster). Wrap each unit in a named `<Group name="…">` and factor any repeated unit into a small local subcomponent — so the design reads as a handful of meaningful groups, not a flat pile of objects. (See "Emit logical groupings" in `canva-authoring`.)
+
 ## Step 4 — Write `designs/<id>/index.tsx`
 
 Read **`canva-authoring`** first, then write. Place objects with literal pixel coordinates; use `var(--ox-*)` tokens for color so the theme drives the palette. Add `export const artboard`, and `export const meta` with `title`, `theme`, and a real `createdAt` (run `node -e "console.log(new Date().toISOString())"`).
