@@ -603,7 +603,8 @@ code {
 }
 /* Hover + selection tint a chip that hugs the icon + label, not the whole row. */
 .ox-layer-chip {
-  display: inline-flex;
+  display: flex;
+  flex: 1;
   align-items: center;
   gap: 9px;
   min-width: 0;
@@ -622,13 +623,14 @@ code {
   color: var(--ui-faint);
 }
 .ox-layer-label {
-  max-width: 150px;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .ox-layer-pos {
-  margin-left: 2px;
+  margin-left: auto;
+  padding-left: 8px;
   color: var(--ui-faint);
   font-size: 11px;
   font-family: var(--ui-mono);
