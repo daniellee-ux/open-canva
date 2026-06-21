@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import config from 'virtual:opencanva/config';
 import { designIds } from 'virtual:opencanva/designs';
-import { designPresets, designToCssVars, resolveDesign } from '../design';
+import { resolveDesign } from '../design';
 import type { CanvaSource } from './lib/fiber';
 import { useDesignModule } from './lib/use-design-module';
-import { useUiTheme, type UiTheme } from './lib/ui-theme';
+import { useUiTheme } from './lib/ui-theme';
+import { useAgentSocketConnected } from './lib/use-agent-socket';
+import { navigate } from './lib/navigate';
 import { findLayoutIssues } from './lib/overflow';
 import { useViewport } from './lib/viewport';
 import { boardToPngDataUrl, exportPdf, exportPng, exportSvg } from './lib/export';
@@ -12,14 +14,12 @@ import { Stage, layoutBoards } from './components/Stage';
 import { Inspector } from './components/Inspector';
 import { LayersPanel } from './components/LayersPanel';
 import { AssetsPanel } from './components/AssetsPanel';
+import { TokensPanel } from './components/TokensPanel';
+import { Home, ThemesPage, ThemeDetail, ThemeToggle } from './components/Workspace';
+import { ToastHost, toast } from './components/ui/toast';
 import { Icon } from './components/icons';
 
 const isDev = import.meta.env.DEV;
-
-function navigate(to: string) {
-  window.history.pushState({}, '', to);
-  window.dispatchEvent(new PopStateEvent('popstate'));
-}
 
 function usePath(): string {
   const [path, setPath] = useState(window.location.pathname);
@@ -31,111 +31,37 @@ function usePath(): string {
   return path;
 }
 
-function ThemeToggle({ theme, onToggle }: { theme: UiTheme; onToggle: () => void }) {
-  const next = theme === 'dark' ? 'light' : 'dark';
+export function App() {
+  const path = usePath();
   return (
-    <button
-      type="button"
-      className="ox-icon-btn ox-theme-toggle"
-      title={`Switch to ${next} mode`}
-      aria-label={`Switch to ${next} mode`}
-      onClick={onToggle}
-    >
-      <Icon
-        name="contrast"
-        size={15}
-        style={{ transform: theme === 'dark' ? 'rotate(180deg)' : 'none', transition: 'transform var(--ui-t) var(--ui-ease)' }}
-      />
-    </button>
+    <>
+      {routePage(path)}
+      <ToastHost />
+    </>
   );
 }
 
-export function App() {
-  const path = usePath();
+function AgentBadge() {
+  const connected = useAgentSocketConnected();
+  return (
+    <span
+      className={`ox-agent${connected ? ' is-live' : ''}`}
+      title={connected ? 'Agent dev link connected — edits sync live' : 'Reconnecting to the dev server…'}
+    >
+      <span className="ox-agent-dot" />
+      {connected ? 'Live' : 'Offline'}
+    </span>
+  );
+}
+
+function routePage(path: string) {
   const match = /^\/d\/([^/]+)/.exec(path);
   if (match) return <DesignPage id={decodeURIComponent(match[1])} />;
+  const themeMatch = /^\/themes\/([^/]+)/.exec(path);
+  if (themeMatch) return <ThemeDetail id={decodeURIComponent(themeMatch[1])} />;
   if (path === '/themes') return <ThemesPage />;
   if (!config.build.showDesignBrowser && designIds.length) return <DesignPage id={designIds[0]} />;
   return <Home />;
-}
-
-function Home() {
-  const { theme, toggle } = useUiTheme();
-  return (
-    <div className="ox-home">
-      <div className="ox-home-inner">
-        <div className="ox-home-top">
-          <div className="ox-home-badge">agent-native graphic design</div>
-          <ThemeToggle theme={theme} onToggle={toggle} />
-        </div>
-        <h1 className="ox-home-title">
-          OpenCanva<span className="ox-dot">.</span>
-        </h1>
-        <p className="ox-home-sub">
-          Design graphics as code. Describe it to your agent, click any object to nudge it, export to
-          PNG / SVG / PDF.{' '}
-          <a className="ox-home-link" href="/themes" onClick={(e) => { e.preventDefault(); navigate('/themes'); }}>
-            Themes <Icon name="forward" size={13} style={{ verticalAlign: '-2px' }} />
-          </a>
-        </p>
-        {designIds.length === 0 ? (
-          <p className="ox-home-empty">
-            No designs yet. Create <code>designs/&lt;id&gt;/index.tsx</code> and it appears here.
-          </p>
-        ) : (
-          <ul className="ox-home-list">
-            {designIds.map((id) => (
-              <li key={id}>
-                <a href={`/d/${encodeURIComponent(id)}`} onClick={(e) => { e.preventDefault(); navigate(`/d/${encodeURIComponent(id)}`); }}>
-                  <span className="ox-home-id">{id}</span>
-                  <span className="ox-home-arrow"><Icon name="forward" size={16} /></span>
-                </a>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ThemesPage() {
-  const names = Object.keys(designPresets);
-  const { theme, toggle } = useUiTheme();
-  return (
-    <div className="ox-themes">
-      <header className="ox-toolbar">
-        <a className="ox-icon-btn" href="/" title="Library" onClick={(e) => { e.preventDefault(); navigate('/'); }}><Icon name="back" /></a>
-        <span className="ox-brand">OpenCanva<span className="ox-dot">.</span></span>
-        <span className="ox-doc-title">Themes</span>
-        <span className="ox-spacer" />
-        <ThemeToggle theme={theme} onToggle={toggle} />
-      </header>
-      <div className="ox-themes-grid">
-        {names.map((name) => {
-          const d = designPresets[name];
-          return (
-            <div key={name} className="ox-theme-card">
-              <div className="ox-theme-swatch" style={{ ...designToCssVars(d), background: 'var(--ox-bg)' }}>
-                <div className="ox-theme-title" style={{ color: 'var(--ox-fg)', fontFamily: 'var(--ox-font-display)' }}>
-                  Aa
-                </div>
-                <div className="ox-theme-dots">
-                  <span style={{ background: 'var(--ox-accent)' }} />
-                  <span style={{ background: 'var(--ox-accent2)' }} />
-                  <span style={{ background: 'var(--ox-surface)' }} />
-                </div>
-              </div>
-              <div className="ox-theme-name">
-                {name}
-                <code>theme: '{name}'</code>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
 }
 
 function DesignPage({ id }: { id: string }) {
@@ -143,6 +69,8 @@ function DesignPage({ id }: { id: string }) {
   const { theme: uiTheme, toggle: toggleUiTheme } = useUiTheme();
   const [inspect, setInspect] = useState(false);
   const [assets, setAssets] = useState(false);
+  const [tokens, setTokens] = useState(false);
+  const [exporting, setExporting] = useState<'png' | 'svg' | 'pdf' | null>(null);
   const [activeBoard, setActiveBoard] = useState(0);
   const [selection, setSelection] = useState<CanvaSource | null>(null);
   const [revision, setRevision] = useState(0);
@@ -170,12 +98,23 @@ function DesignPage({ id }: { id: string }) {
       activeBoard,
       board: scenes[activeBoard]?.id ?? `scene-${activeBoard + 1}`,
       zoom: Math.round(vp.zoom * 100) / 100,
-      view: inspect ? 'inspect' : 'view',
+      view: tokens ? 'tokens' : assets ? 'assets' : inspect ? 'inspect' : 'view',
       selection: selection
         ? { rel: selection.rel, line: selection.line, column: selection.column, tag: selection.tag }
         : null,
     });
-  }, [id, title, activeBoard, vp.zoom, inspect, selection, mod, scenes]);
+  }, [id, title, activeBoard, vp.zoom, inspect, assets, tokens, selection, mod, scenes]);
+
+  // A selection belongs to one board; clear the published cursor selection when
+  // the board or design changes (the inspector drops its own via the activeBoard prop).
+  useEffect(() => {
+    setSelection(null);
+  }, [activeBoard, id]);
+
+  // Keep the active board index in range when boards are deleted/reordered.
+  useEffect(() => {
+    if (scenes.length && activeBoard >= scenes.length) setActiveBoard(scenes.length - 1);
+  }, [scenes.length, activeBoard]);
 
   // Dev layout check — warn once per load when an object's rendered content
   // overflows its container (e.g. a caption that wrapped past its card). The
@@ -212,16 +151,30 @@ function DesignPage({ id }: { id: string }) {
   }
   if (!mod) return <div className="ox-msg"><span className="ox-loading">Loading {id}…</span></div>;
 
-  const doExport = (kind: 'png' | 'svg' | 'pdf') => {
-    const boards = document.querySelectorAll<HTMLElement>('.ox-board');
+  const doExport = async (kind: 'png' | 'svg' | 'pdf') => {
+    if (exporting) return; // lock out concurrent exports
+    // Scope to the live canvas: LayersPanel thumbnails also render real `.ox-board`
+    // nodes (before Stage in the DOM), so an unscoped query would export a thumbnail.
+    const boards = document.querySelectorAll<HTMLElement>('.ox-canvas .ox-board');
     const board = boards[activeBoard] ?? boards[0];
-    if (!board) return;
     const at = layout.boards[activeBoard]?.artboard ?? layout.boards[0]?.artboard;
-    if (!at) return;
-    const fname = `${id}${scenes.length > 1 ? `-${activeBoard + 1}` : ''}`;
-    if (kind === 'png') void exportPng(board, at.w, at.h, fname);
-    else if (kind === 'svg') void exportSvg(board, at.w, at.h, fname);
-    else void exportPdf(board, at.w, at.h, fname);
+    if (!board || !at) {
+      toast.err('Nothing to export — no board is rendered.');
+      return;
+    }
+    const slug = (title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || id);
+    const fname = `${slug}${scenes.length > 1 ? `-${activeBoard + 1}` : ''}`;
+    setExporting(kind);
+    try {
+      if (kind === 'png') await exportPng(board, at.w, at.h, fname);
+      else if (kind === 'svg') await exportSvg(board, at.w, at.h, fname);
+      else await exportPdf(board, at.w, at.h, fname);
+      toast.ok(`Exported ${fname}.${kind}`);
+    } catch (err) {
+      toast.err(`Export failed: ${String((err as Error)?.message ?? err)}`);
+    } finally {
+      setExporting(null);
+    }
   };
 
   // Dev fidelity hook: returns the real export PNG as a data URL so the rendered
@@ -229,7 +182,7 @@ function DesignPage({ id }: { id: string }) {
   if (isDev) {
     (window as unknown as Record<string, unknown>).__ox = {
       pngDataUrl: (scale = 1) => {
-        const boards = document.querySelectorAll<HTMLElement>('.ox-board');
+        const boards = document.querySelectorAll<HTMLElement>('.ox-canvas .ox-board');
         const board = boards[activeBoard] ?? boards[0];
         const at = layout.boards[activeBoard]?.artboard ?? layout.boards[0]?.artboard;
         return board && at ? boardToPngDataUrl(board, at.w, at.h, scale) : Promise.resolve(null);
@@ -240,7 +193,7 @@ function DesignPage({ id }: { id: string }) {
   }
 
   return (
-    <div className="ox-app">
+    <div className={`ox-app${inspect ? ' is-inspecting' : ''}`}>
       {showUi && (
         <header className="ox-toolbar">
           {config.build.showDesignBrowser && (
@@ -248,6 +201,7 @@ function DesignPage({ id }: { id: string }) {
           )}
           <span className="ox-brand">OpenCanva<span className="ox-dot">.</span></span>
           <span className="ox-doc-title">{title}</span>
+          {isDev && <AgentBadge />}
 
           <span className="ox-spacer" />
 
@@ -262,7 +216,8 @@ function DesignPage({ id }: { id: string }) {
           {scenes.length > 1 && (
             <select className="ox-board-select" value={activeBoard} onChange={(e) => setActiveBoard(Number(e.target.value))}>
               {scenes.map((s, i) => (
-                <option key={s.id ?? i} value={i}>{s.label ?? s.id ?? `Board ${i + 1}`}</option>
+                // Index-suffixed: a duplicated board shares its source component's id.
+                <option key={`${s.id ?? 'scene'}-${i}`} value={i}>{s.label ?? s.id ?? `Board ${i + 1}`}</option>
               ))}
             </select>
           )}
@@ -273,15 +228,20 @@ function DesignPage({ id }: { id: string }) {
             </button>
           )}
           {isDev && (
-            <button type="button" className={`ox-btn${assets ? ' ox-btn--active' : ''}`} aria-pressed={assets} onClick={() => setAssets((v) => !v)}>Assets</button>
+            <button type="button" className={`ox-btn${assets ? ' ox-btn--active' : ''}`} aria-pressed={assets} onClick={() => { setAssets((v) => !v); setTokens(false); }}>Assets</button>
+          )}
+          {isDev && (
+            <button type="button" className={`ox-btn${tokens ? ' ox-btn--active' : ''}`} aria-pressed={tokens} onClick={() => { setTokens((v) => !v); setAssets(false); }}>Tokens</button>
           )}
 
           <div className="ox-menu">
-            <button type="button" className="ox-btn ox-btn--primary">Export <Icon name="caret" size={14} /></button>
+            <button type="button" className="ox-btn ox-btn--primary" aria-busy={!!exporting}>
+              {exporting ? `Exporting ${exporting.toUpperCase()}…` : <>Export <Icon name="caret" size={14} /></>}
+            </button>
             <div className="ox-menu-list">
-              {config.build.allowPngDownload && <button type="button" onClick={() => doExport('png')}>PNG</button>}
-              {config.build.allowSvgDownload && <button type="button" onClick={() => doExport('svg')}>SVG</button>}
-              {config.build.allowPdfDownload && <button type="button" onClick={() => doExport('pdf')}>PDF</button>}
+              {config.build.allowPngDownload && <button type="button" disabled={!!exporting} onClick={() => doExport('png')}>PNG</button>}
+              {config.build.allowSvgDownload && <button type="button" disabled={!!exporting} onClick={() => doExport('svg')}>SVG</button>}
+              {config.build.allowPdfDownload && <button type="button" disabled={!!exporting} onClick={() => doExport('pdf')}>PDF</button>}
             </div>
           </div>
         </header>
@@ -295,6 +255,8 @@ function DesignPage({ id }: { id: string }) {
             designKey={id}
             activeBoard={activeBoard}
             onFocusBoard={(i) => { setActiveBoard(i); vp.fit(); }}
+            design={design}
+            moduleArtboard={mod.artboard}
           />
         )}
         <Stage
@@ -308,8 +270,9 @@ function DesignPage({ id }: { id: string }) {
       </div>
 
       {assets ? <AssetsPanel designId={id} onClose={() => setAssets(false)} /> : null}
+      {tokens ? <TokensPanel designId={id} design={design} onClose={() => setTokens(false)} /> : null}
       {isDev && showUi ? (
-        <Inspector active={inspect} zoom={vp.zoom} revision={revision} designId={id} onSelectionChange={setSelection} />
+        <Inspector active={inspect} zoom={vp.zoom} revision={revision} designId={id} activeBoard={activeBoard} onSelectionChange={setSelection} panBy={vp.panBy} />
       ) : null}
     </div>
   );

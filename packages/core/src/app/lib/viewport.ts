@@ -18,6 +18,8 @@ export interface Viewport {
   transform: string;
   zoomBy: (factor: number) => void;
   zoomTo: (z: number) => void;
+  /** Pan by a screen-pixel delta (used by the inspector's edit-mode pan gesture). */
+  panBy: (dx: number, dy: number) => void;
   fit: () => void;
   actualSize: () => void;
 }
@@ -94,13 +96,22 @@ export function useViewport(
     [stageRef, applyZoom],
   );
 
+  const panBy = useCallback((dx: number, dy: number) => {
+    const p = panRef.current;
+    setPan({ x: p.x + dx, y: p.y + dy });
+  }, []);
+
   // Fit once on mount (after layout), and whenever the content size changes.
   useEffect(() => {
     const id = requestAnimationFrame(fit);
     return () => cancelAnimationFrame(id);
   }, [fit, content.w, content.h]);
 
-  // Imperative wheel + pointer handlers, bound once (passive:false for zoom).
+  // Imperative wheel + pointer handlers (passive:false for zoom). The host renders
+  // a "Loading…" placeholder before <Stage> mounts, so on the first run stageRef is
+  // still null and we bail; re-run once the design is ready (content gets real
+  // dimensions, same trigger the fit effect uses) so the listeners actually attach —
+  // otherwise pinch-zoom and trackpad/drag pan silently never work.
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
@@ -121,22 +132,23 @@ export function useViewport(
     };
 
     let panning = false;
-    let spaceHeld = false;
     let last = { x: 0, y: 0 };
 
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space') spaceHeld = true;
-    };
-    const onKeyUp = (e: KeyboardEvent) => {
-      if (e.code === 'Space') spaceHeld = false;
-    };
     const onPointerDown = (e: PointerEvent) => {
-      const wantsPan = e.button === 1 || (e.button === 0 && spaceHeld);
+      // Pan on middle-drag or a plain left-drag of the canvas. In inspect mode the
+      // inspector stops propagation for object/marquee gestures before this
+      // stage-level handler runs, so a left-drag only pans the empty canvas (or
+      // anywhere in view mode).
+      const wantsPan = e.button === 0 || e.button === 1;
       if (!wantsPan) return;
       e.preventDefault();
       panning = true;
       last = { x: e.clientX, y: e.clientY };
-      stage.setPointerCapture(e.pointerId);
+      try {
+        stage.setPointerCapture(e.pointerId);
+      } catch {
+        /* capture is best-effort; panning still works without it */
+      }
       stage.classList.add('ox-stage--grabbing');
     };
     const onPointerMove = (e: PointerEvent) => {
@@ -160,17 +172,13 @@ export function useViewport(
     stage.addEventListener('pointerdown', onPointerDown);
     stage.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
     return () => {
       stage.removeEventListener('wheel', onWheel);
       stage.removeEventListener('pointerdown', onPointerDown);
       stage.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
     };
-  }, [stageRef, applyZoom]);
+  }, [stageRef, applyZoom, content.w, content.h]);
 
   return {
     zoom,
@@ -178,6 +186,7 @@ export function useViewport(
     transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
     zoomBy,
     zoomTo,
+    panBy,
     fit,
     actualSize,
   };
