@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import config from 'virtual:opencanva/config';
 import { designIds } from 'virtual:opencanva/designs';
 import { resolveDesign } from '../design';
@@ -78,6 +78,13 @@ function DesignPage({ id }: { id: string }) {
   const [exporting, setExporting] = useState<'png' | 'svg' | 'pdf' | null>(null);
   const [activeBoard, setActiveBoard] = useState(0);
   const [selection, setSelection] = useState<CanvaSource | null>(null);
+  // The selected canvas object's live DOM node, so the layers panel can highlight
+  // and scroll to its row — and selecting a row selects it (bi-directional).
+  const [selectedEl, setSelectedEl] = useState<HTMLElement | null>(null);
+  const handleSelectionChange = useCallback((src: CanvaSource | null, el: HTMLElement | null) => {
+    setSelection(src);
+    setSelectedEl(el);
+  }, []);
   const [revision, setRevision] = useState(0);
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -114,6 +121,7 @@ function DesignPage({ id }: { id: string }) {
   // the board or design changes (the inspector drops its own via the activeBoard prop).
   useEffect(() => {
     setSelection(null);
+    setSelectedEl(null);
   }, [activeBoard, id]);
 
   // Keep the active board index in range when boards are deleted/reordered.
@@ -262,6 +270,7 @@ function DesignPage({ id }: { id: string }) {
             onFocusBoard={(i) => { setActiveBoard(i); vp.fit(); }}
             design={design}
             moduleArtboard={mod.artboard}
+            selectedEl={selectedEl}
           />
         )}
         <Stage
@@ -277,7 +286,7 @@ function DesignPage({ id }: { id: string }) {
       {assets ? <AssetsPanel designId={id} onClose={() => setAssets(false)} /> : null}
       {tokens ? <TokensPanel designId={id} design={design} onClose={() => setTokens(false)} /> : null}
       {isDev && showUi ? (
-        <Inspector active={inspect} zoom={vp.zoom} revision={revision} designId={id} activeBoard={activeBoard} onSelectionChange={setSelection} panBy={vp.panBy} />
+        <Inspector active={inspect} zoom={vp.zoom} revision={revision} designId={id} activeBoard={activeBoard} onSelectionChange={handleSelectionChange} panBy={vp.panBy} />
       ) : null}
     </div>
   );

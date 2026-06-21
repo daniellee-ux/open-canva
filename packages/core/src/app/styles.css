@@ -640,6 +640,21 @@ code {
 .ox-layers-objs li.is-child .ox-layer-label {
   color: var(--ui-muted);
 }
+/* Selected object — its row mirrors the canvas selection (bi-directional). */
+.ox-layers-objs li.is-selected {
+  background: var(--ui-accent-weak);
+  box-shadow: inset 2px 0 0 var(--ui-accent-strong);
+}
+.ox-layers-objs li.is-selected:hover {
+  background: var(--ui-accent-weak);
+}
+.ox-layers-objs li.is-selected .ox-layer-label {
+  color: var(--ui-accent-strong);
+  font-weight: 600;
+}
+.ox-layers-objs li.is-selected .ox-layer-glyph {
+  color: var(--ui-accent-strong);
+}
 .ox-layers-empty {
   padding: 8px 12px;
   color: var(--ui-faint);

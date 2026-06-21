@@ -243,7 +243,7 @@ export function Inspector({
   designId?: string;
   /** The focused board; changing it drops a selection that belongs to another board. */
   activeBoard?: number;
-  onSelectionChange?: (src: CanvaSource | null) => void;
+  onSelectionChange?: (src: CanvaSource | null, el: HTMLElement | null) => void;
   /** Pan the viewport by a screen-pixel delta — drives edit-mode drag-to-pan. */
   panBy?: (dx: number, dy: number) => void;
 }) {
@@ -408,7 +408,7 @@ export function Inspector({
       setHovBox(null);
       setText((el.textContent ?? '').replace(/\s+/g, ' ').trim());
       setComment(existingCommentFor(el)); // pre-fill so a left comment is viewable
-      onSelectionChange?.(src);
+      onSelectionChange?.(src, el);
     },
     [onSelectionChange, existingCommentFor],
   );
@@ -444,7 +444,7 @@ export function Inspector({
         setExtraBoxes([]);
         setSelRect(null);
         setSelBox(null);
-        onSelectionChange?.(null);
+        onSelectionChange?.(null, null);
         return;
       }
       const [first, ...rest] = list;
@@ -459,7 +459,7 @@ export function Inspector({
       setSelBox(box);
       setHovRect(null);
       setHovBox(null);
-      onSelectionChange?.(first.src);
+      onSelectionChange?.(first.src, first.el);
       reflow();
     },
     [existingCommentFor, onSelectionChange, reflow],
@@ -473,7 +473,7 @@ export function Inspector({
     setExtraBoxes([]);
     setSelRect(null);
     setSelBox(null);
-    onSelectionChange?.(null);
+    onSelectionChange?.(null, null);
   }, [onSelectionChange]);
 
   // Jump from a comments-panel row to the object it annotates (select + center).
@@ -942,6 +942,7 @@ export function Inspector({
     extraRef.current = nextExtra;
     setSel(primary);
     setExtra(nextExtra);
+    onSelectionChange?.(primary.src, primary.el); // keep the layers-panel highlight bound to the new node
     reflow();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [revision]);

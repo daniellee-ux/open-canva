@@ -42,6 +42,7 @@ export function LayersPanel({
   onFocusBoard,
   design,
   moduleArtboard,
+  selectedEl,
 }: {
   scenes: Scene[];
   designKey: string;
@@ -49,10 +50,13 @@ export function LayersPanel({
   onFocusBoard: (index: number) => void;
   design: DesignSystem;
   moduleArtboard?: Artboard;
+  /** The currently-selected canvas object, to highlight + scroll its row into view. */
+  selectedEl?: HTMLElement | null;
 }) {
   const [rows, setRows] = useState<ObjRow[]>([]);
   const tick = useRef(0);
   const activeBoardRef = useRef<HTMLLIElement>(null);
+  const selectedRowRef = useRef<HTMLLIElement>(null);
   const dragIdx = useRef<number | null>(null);
   const [dropIdx, setDropIdx] = useState<number | null>(null);
 
@@ -64,6 +68,11 @@ export function LayersPanel({
   useEffect(() => {
     activeBoardRef.current?.scrollIntoView({ block: 'nearest' });
   }, [activeBoard]);
+
+  // Bring the selected object's row into view (canvas selection → panel).
+  useEffect(() => {
+    if (selectedEl) selectedRowRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [selectedEl]);
 
   useEffect(() => {
     const canvas = document.querySelector<HTMLElement>('.ox-canvas');
@@ -208,7 +217,8 @@ export function LayersPanel({
         {rows.map((r, i) => (
           <li
             key={i}
-            className={r.type === 'group' ? 'is-group' : r.depth > 0 ? 'is-child' : undefined}
+            ref={r.el === selectedEl ? selectedRowRef : undefined}
+            className={`${r.type === 'group' ? 'is-group' : r.depth > 0 ? 'is-child' : ''}${r.el === selectedEl ? ' is-selected' : ''}`.trim() || undefined}
             style={{ paddingLeft: 10 + r.depth * 16 }}
             onMouseEnter={() => peek(r.el, true)}
             onMouseLeave={() => peek(r.el, false)}
