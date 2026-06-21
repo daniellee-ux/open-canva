@@ -224,8 +224,10 @@ export function LayersPanel({
             onMouseLeave={() => peek(r.el, false)}
             onClick={() => selectObj(r.el)}
           >
-            <span className="ox-layer-glyph"><Icon name={TYPE_ICON[r.type] ?? 'dot'} size={14} /></span>
-            <span className="ox-layer-label">{r.label}</span>
+            <span className="ox-layer-chip">
+              <span className="ox-layer-glyph"><Icon name={TYPE_ICON[r.type] ?? 'dot'} size={14} /></span>
+              <span className="ox-layer-label">{r.label}</span>
+            </span>
             <span className="ox-layer-pos">
               {r.x},{r.y}
             </span>
