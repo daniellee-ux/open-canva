@@ -625,6 +625,21 @@ code {
   font-family: var(--ui-mono);
   font-variant-numeric: tabular-nums;
 }
+/* Group rows head their nested children (which are indented): emphasize the group
+   name + icon, and quiet the children, so the layer tree reads as a hierarchy. */
+.ox-layers-objs li.is-group {
+  margin-top: 3px;
+}
+.ox-layers-objs li.is-group .ox-layer-label {
+  font-weight: 600;
+  color: var(--ui-fg);
+}
+.ox-layers-objs li.is-group .ox-layer-glyph {
+  color: var(--ui-accent-strong);
+}
+.ox-layers-objs li.is-child .ox-layer-label {
+  color: var(--ui-muted);
+}
 .ox-layers-empty {
   padding: 8px 12px;
   color: var(--ui-faint);

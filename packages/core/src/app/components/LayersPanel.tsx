@@ -21,6 +21,8 @@ interface ObjRow {
   label: string;
   x: number;
   y: number;
+  /** Nesting depth (objects inside a Group/Box), for the indented layer tree. */
+  depth: number;
 }
 
 const TYPE_ICON: Record<string, IconName> = {
@@ -68,6 +70,15 @@ export function LayersPanel({
     if (!canvas) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const refresh = () => {
+      // querySelectorAll yields document order (a container immediately before its
+      // children), so a depth count turns the flat list into a readable tree.
+      const depthOf = (el: HTMLElement) => {
+        let d = 0;
+        for (let p = el.parentElement; p && p !== canvas; p = p.parentElement) {
+          if (p.hasAttribute('data-ox-obj')) d++;
+        }
+        return d;
+      };
       const objs = Array.from(canvas.querySelectorAll<HTMLElement>('[data-ox-obj]'));
       setRows(
         objs.map((el) => ({
@@ -80,6 +91,7 @@ export function LayersPanel({
               : '') || el.getAttribute('data-ox-type') || 'object',
           x: Number(el.getAttribute('data-ox-x') ?? 0),
           y: Number(el.getAttribute('data-ox-y') ?? 0),
+          depth: depthOf(el),
         })),
       );
     };
@@ -182,6 +194,8 @@ export function LayersPanel({
         {rows.map((r, i) => (
           <li
             key={i}
+            className={r.type === 'group' ? 'is-group' : r.depth > 0 ? 'is-child' : undefined}
+            style={{ paddingLeft: 10 + r.depth * 16 }}
             onMouseEnter={() => peek(r.el, true)}
             onMouseLeave={() => peek(r.el, false)}
           >
