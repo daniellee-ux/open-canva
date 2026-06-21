@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Scene } from '../../sdk';
+import type { DesignSystem } from '../../design';
+import { type Artboard, resolveArtboard, type Scene } from '../../sdk';
+import { deleteBoard, duplicateBoard, reorderBoards } from '../lib/design-crud';
+import { ThumbBoard } from './ThumbBoard';
+import { Menu } from './ui/Menu';
+import { toast } from './ui/toast';
 import { Icon, type IconName } from './icons';
+
+const isDev = import.meta.env.DEV;
 
 /**
  * Layers + boards navigator — replaces open-doc's table of contents. Lists the
@@ -32,15 +39,31 @@ export function LayersPanel({
   designKey,
   activeBoard,
   onFocusBoard,
+  design,
+  moduleArtboard,
 }: {
   scenes: Scene[];
   title: string;
   designKey: string;
   activeBoard: number;
   onFocusBoard: (index: number) => void;
+  design: DesignSystem;
+  moduleArtboard?: Artboard;
 }) {
   const [rows, setRows] = useState<ObjRow[]>([]);
   const tick = useRef(0);
+  const activeBoardRef = useRef<HTMLLIElement>(null);
+  const dragIdx = useRef<number | null>(null);
+  const [dropIdx, setDropIdx] = useState<number | null>(null);
+
+  const onBoardOp = (p: Promise<unknown>, ok: string) => {
+    p.then(() => toast.ok(ok)).catch((e) => toast.err(String((e as Error)?.message ?? e)));
+  };
+
+  // Keep the active board in view as the user steps through boards.
+  useEffect(() => {
+    activeBoardRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [activeBoard]);
 
   useEffect(() => {
     const canvas = document.querySelector<HTMLElement>('.ox-canvas');
@@ -53,6 +76,7 @@ export function LayersPanel({
           el,
           type: el.getAttribute('data-ox-type') ?? 'object',
           label:
+            el.getAttribute('data-ox-name') ||
             (el.getAttribute('data-ox-type') === 'text' || el.getAttribute('data-ox-type') === 'icon'
               ? (el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 22)
               : '') || el.getAttribute('data-ox-type') || 'object',
@@ -85,11 +109,69 @@ export function LayersPanel({
           <div className="ox-layers-section">Boards</div>
           <ul className="ox-layers-boards">
             {scenes.map((s, i) => (
-              <li key={s.id ?? i} className={i === activeBoard ? 'is-active' : ''}>
+              <li
+                // Index-suffixed so a duplicated board (which shares the source
+                // component's id) can't collide with its twin.
+                key={`${s.id ?? 'scene'}-${i}`}
+                ref={i === activeBoard ? activeBoardRef : undefined}
+                className={`${i === activeBoard ? 'is-active' : ''}${dropIdx === i ? ' is-drop' : ''}`}
+                draggable={isDev}
+                onDragStart={(e) => {
+                  dragIdx.current = i;
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                onDragOver={(e) => {
+                  if (dragIdx.current == null) return;
+                  e.preventDefault();
+                  setDropIdx(i);
+                }}
+                onDragLeave={() => setDropIdx((d) => (d === i ? null : d))}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const from = dragIdx.current;
+                  dragIdx.current = null;
+                  setDropIdx(null);
+                  if (from == null || from === i) return;
+                  const order = scenes.map((_, k) => k);
+                  const [m] = order.splice(from, 1);
+                  order.splice(i, 0, m);
+                  onBoardOp(reorderBoards(designKey, order), 'Boards reordered');
+                }}
+                onDragEnd={() => {
+                  dragIdx.current = null;
+                  setDropIdx(null);
+                }}
+              >
                 <button type="button" aria-current={i === activeBoard ? 'true' : undefined} onClick={() => onFocusBoard(i)}>
-                  <span className="ox-board-dot" />
-                  {s.label ?? s.id ?? `Board ${i + 1}`}
+                  <ThumbBoard
+                    scene={s}
+                    artboard={resolveArtboard(s, moduleArtboard)}
+                    design={design}
+                    className="ox-board-thumb"
+                  />
+                  <span className="ox-board-name">
+                    <span className="ox-board-index">{String(i + 1).padStart(2, '0')}</span>
+                    <span className="ox-board-label">{s.label ?? s.id ?? `Board ${i + 1}`}</span>
+                  </span>
                 </button>
+                {isDev ? (
+                  <div className="ox-board-menu">
+                    <Menu
+                      label={`Board ${i + 1} actions`}
+                      button={<span className="ox-board-menu-btn"><Icon name="caret" size={14} /></span>}
+                      items={[
+                        { label: 'Duplicate', icon: 'group', onSelect: () => onBoardOp(duplicateBoard(designKey, i), 'Board duplicated') },
+                        {
+                          label: 'Delete',
+                          icon: 'close',
+                          danger: true,
+                          disabled: scenes.length <= 1,
+                          onSelect: () => onBoardOp(deleteBoard(designKey, i), 'Board deleted'),
+                        },
+                      ]}
+                    />
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>

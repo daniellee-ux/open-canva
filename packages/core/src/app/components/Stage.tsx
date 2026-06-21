@@ -53,7 +53,7 @@ export function Stage({
       >
         {boards.map((b) => (
           <div
-            key={b.scene.id ?? `scene-${b.index + 1}`}
+            key={`${b.scene.id ?? 'scene'}-${b.index}`}
             className="ox-board-slot"
             style={{ position: 'absolute', left: b.x, top: (contentH - b.artboard.h) / 2 }}
           >
