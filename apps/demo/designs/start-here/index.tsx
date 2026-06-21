@@ -2,21 +2,22 @@ import { Box, Ellipse, Group, Line, Text } from '@opencanva/core';
 import type { Artboard, DesignMeta, Scene } from '@opencanva/core';
 
 /**
- * A reusable subcomponent. In OpenCanva a plain React component IS the reusable
- * unit — there's no symbol/instance system. Each instance only needs an x/y; its
- * children sit at coordinates relative to the <Group>. Edit the component once and
- * every instance updates.
+ * A reusable subcomponent that shares STYLE, not position. It defines the shared
+ * look of a step (number + title + body) at coordinates relative to its parent;
+ * each instance is wrapped below in its own <Group x={…} y={…}> whose literal
+ * position the inspector rewrites independently. So: edit the styling here once and
+ * all steps update, but drag a step on the canvas and only that one moves.
  */
-function Step({ x, y, n, title, body }: { x: number; y: number; n: string; title: string; body: string }) {
+function StepBody({ n, title, body }: { n: string; title: string; body: string }) {
   return (
-    <Group x={x} y={y} name={`Step ${n}`}>
+    <>
       <Text x={0} y={0} w={780} size={27} weight={700} color="var(--ox-fg)" font="display">
         {`${n}    ${title}`}
       </Text>
       <Text x={0} y={40} w={780} size={21} weight={400} color="var(--ox-muted)" font="body">
         {body}
       </Text>
-    </Group>
+    </>
   );
 }
 
@@ -57,10 +58,17 @@ const Main: Scene = () => (
       <Line x={6} y={480} w={132} thickness={4} color="var(--ox-accent)" />
     </Group>
 
-    {/* ── three pointers — instances of the <Step> subcomponent above ── */}
-    <Step x={122} y={752} n="01" title="Open a design" body={'Each one lives in designs/<id>/index.tsx'} />
-    <Step x={122} y={842} n="02" title="Edit on the canvas" body="Click any object to jump straight to its code" />
-    <Step x={122} y={932} n="03" title="Make your own" body="Ask the agent, or copy a design folder and start placing objects" />
+    {/* ── three pointers — each its own <Group> (independent position), all sharing
+        one <StepBody> (shared style). Drag a step: only it moves. Restyle StepBody: all change. ── */}
+    <Group x={122} y={752} name="Step 01">
+      <StepBody n="01" title="Open a design" body={'Each one lives in designs/<id>/index.tsx'} />
+    </Group>
+    <Group x={122} y={842} name="Step 02">
+      <StepBody n="02" title="Edit on the canvas" body="Click any object to jump straight to its code" />
+    </Group>
+    <Group x={122} y={932} name="Step 03">
+      <StepBody n="03" title="Make your own" body="Ask the agent, or copy a design folder and start placing objects" />
+    </Group>
 
     {/* ── code card (right) — designs are just components ── */}
     <Box x={1016} y={236} w={784} h={560} radius={20} fill="var(--ox-surface)" borderColor="var(--ox-muted)" borderWidth={1} shadow="0 24px 60px rgba(20,20,30,0.14)" z={2}>
