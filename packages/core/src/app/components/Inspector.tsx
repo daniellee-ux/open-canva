@@ -1541,7 +1541,7 @@ export function Inspector({
             <textarea ref={commentTextRef} className="ox-pop-text" value={comment} placeholder="e.g. “make this headline pop more”" onChange={(e) => setComment(e.target.value)} onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') runComment(); }} />
             <div className="ox-pop-actions">
               <button type="button" className="ox-pop-btn" onClick={deselect}>Close</button>
-              <button type="button" className="ox-pop-btn" disabled={!sel.src || !comment.trim()} onClick={runComment}>{existingCommentFor(sel.el) ? 'Update comment' : 'Add comment'}</button>
+              <button type="button" className="ox-pop-btn ox-pop-btn--primary" disabled={!sel.src || !comment.trim()} onClick={runComment}>{existingCommentFor(sel.el) ? 'Update comment' : 'Add comment'}</button>
             </div>
           </Popover>
         </>
