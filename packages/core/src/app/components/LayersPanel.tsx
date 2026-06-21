@@ -110,6 +110,20 @@ export function LayersPanel({
 
   const peek = (el: HTMLElement, on: boolean) => el.classList.toggle('ox-peek', on);
 
+  // Click a layer row to select that object on the canvas — especially useful for
+  // a <Group>, whose children cover it so it's hard to click directly. Dispatching
+  // pointerdown on the element itself routes through the inspector's own select
+  // path (closest(OBJ) resolves to this element, not whatever is under the cursor).
+  // Only meaningful in edit mode, where the inspector is listening.
+  const selectObj = (el: HTMLElement) => {
+    if (!document.querySelector('.ox-app')?.classList.contains('is-inspecting')) return;
+    const r = el.getBoundingClientRect();
+    const cx = Math.round(r.left + r.width / 2);
+    const cy = Math.round(r.top + r.height / 2);
+    el.dispatchEvent(new PointerEvent('pointerdown', { button: 0, pointerId: 1, clientX: cx, clientY: cy, bubbles: true }));
+    window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, clientX: cx, clientY: cy, bubbles: true }));
+  };
+
   return (
     <aside className="ox-layers">
       {scenes.length > 1 ? (
@@ -198,6 +212,7 @@ export function LayersPanel({
             style={{ paddingLeft: 10 + r.depth * 16 }}
             onMouseEnter={() => peek(r.el, true)}
             onMouseLeave={() => peek(r.el, false)}
+            onClick={() => selectObj(r.el)}
           >
             <span className="ox-layer-glyph"><Icon name={TYPE_ICON[r.type] ?? 'dot'} size={14} /></span>
             <span className="ox-layer-label">{r.label}</span>

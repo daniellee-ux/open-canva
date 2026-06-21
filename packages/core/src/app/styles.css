@@ -600,7 +600,7 @@ code {
   padding: 7px 10px;
   border-radius: var(--ui-r-sm);
   font-size: 13px;
-  cursor: default;
+  cursor: pointer;
   transition: background var(--ui-t) var(--ui-ease);
 }
 .ox-layers-objs li:hover {
