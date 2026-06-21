@@ -628,8 +628,7 @@ code {
   white-space: nowrap;
 }
 .ox-layer-pos {
-  margin-left: auto;
-  padding-left: 8px;
+  margin-left: 2px;
   color: var(--ui-faint);
   font-size: 11px;
   font-family: var(--ui-mono);
