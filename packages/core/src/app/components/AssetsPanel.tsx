@@ -16,6 +16,10 @@ export function AssetsPanel({ designId, onClose }: { designId: string; onClose: 
   const [renaming, setRenaming] = useState<{ name: string; value: string } | null>(null);
   const [confirmDel, setConfirmDel] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Depth counter: dragenter/dragleave fire for every child, so a single boolean
+  // guarded by currentTarget===target leaves the overlay stuck when the pointer
+  // exits over a child. Counting balanced enter/leave pairs is robust.
+  const dragDepth = useRef(0);
 
   const reload = useCallback(() => {
     listAssets(designId)
@@ -89,15 +93,21 @@ export function AssetsPanel({ designId, onClose }: { designId: string; onClose: 
   return (
     <div
       className={`ox-assets${dragging ? ' is-dragging' : ''}`}
-      onDragOver={(e) => {
+      onDragEnter={(e) => {
         e.preventDefault();
+        dragDepth.current += 1;
         setDragging(true);
       }}
-      onDragLeave={(e) => {
-        if (e.currentTarget === e.target) setDragging(false);
+      onDragOver={(e) => {
+        e.preventDefault();
+      }}
+      onDragLeave={() => {
+        dragDepth.current = Math.max(0, dragDepth.current - 1);
+        if (dragDepth.current === 0) setDragging(false);
       }}
       onDrop={(e) => {
         e.preventDefault();
+        dragDepth.current = 0;
         setDragging(false);
         if (e.dataTransfer.files.length) void doUpload(e.dataTransfer.files);
       }}

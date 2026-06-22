@@ -31,7 +31,10 @@ const FONT_PRESETS = [
 const fontName = (s: string) => s.split(',')[0].replace(/['"]/g, '').trim();
 
 function setBoardVar(cssVar: string, value: string) {
-  for (const b of document.querySelectorAll<HTMLElement>('[data-ox-board]')) b.style.setProperty(cssVar, value);
+  // Scope to the edited design's canvas so we don't recolor unrelated ThumbBoards,
+  // which render real [data-ox-board] nodes outside .ox-canvas.
+  const root: ParentNode = document.querySelector('.ox-canvas') ?? document;
+  for (const b of root.querySelectorAll<HTMLElement>('[data-ox-board]')) b.style.setProperty(cssVar, value);
 }
 
 export function TokensPanel({ designId, design, onClose }: { designId: string; design: DesignSystem; onClose: () => void }) {
@@ -40,6 +43,10 @@ export function TokensPanel({ designId, design, onClose }: { designId: string; d
 
   // Re-sync the draft when the underlying design changes (HMR after a commit).
   useEffect(() => setDraft(design), [design]);
+
+  // Cancel any pending debounced commit on unmount, so a write can't fire for a
+  // design the user has just closed or navigated away from.
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
   const commit = (next: DesignSystem) => {
     if (timer.current) clearTimeout(timer.current);

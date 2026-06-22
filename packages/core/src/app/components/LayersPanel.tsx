@@ -23,6 +23,8 @@ interface ObjRow {
   y: number;
   /** Nesting depth (objects inside a Group/Box), for the indented layer tree. */
   depth: number;
+  /** Stable per-element React key, so reordering rows doesn't strand a hover class. */
+  key: number;
 }
 
 const TYPE_ICON: Record<string, IconName> = {
@@ -59,6 +61,18 @@ export function LayersPanel({
   const selectedRowRef = useRef<HTMLLIElement>(null);
   const dragIdx = useRef<number | null>(null);
   const [dropIdx, setDropIdx] = useState<number | null>(null);
+  // Stable identity per object element so row keys survive list reorder/mutation
+  // (an array-index key strands the ox-peek hover class on the wrong element).
+  const idMap = useRef(new WeakMap<HTMLElement, number>());
+  const nextId = useRef(0);
+  const keyFor = (el: HTMLElement) => {
+    let id = idMap.current.get(el);
+    if (id == null) {
+      id = nextId.current++;
+      idMap.current.set(el, id);
+    }
+    return id;
+  };
 
   const onBoardOp = (p: Promise<unknown>, ok: string) => {
     p.then(() => toast.ok(ok)).catch((e) => toast.err(String((e as Error)?.message ?? e)));
@@ -101,6 +115,7 @@ export function LayersPanel({
           x: Number(el.getAttribute('data-ox-x') ?? 0),
           y: Number(el.getAttribute('data-ox-y') ?? 0),
           depth: depthOf(el),
+          key: keyFor(el),
         })),
       );
     };
@@ -126,11 +141,27 @@ export function LayersPanel({
   // Only meaningful in edit mode, where the inspector is listening.
   const selectObj = (el: HTMLElement) => {
     if (!document.querySelector('.ox-app')?.classList.contains('is-inspecting')) return;
-    const r = el.getBoundingClientRect();
-    const cx = Math.round(r.left + r.width / 2);
-    const cy = Math.round(r.top + r.height / 2);
-    el.dispatchEvent(new PointerEvent('pointerdown', { button: 0, pointerId: 1, clientX: cx, clientY: cy, bubbles: true }));
-    window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, clientX: cx, clientY: cy, bubbles: true }));
+    const fire = () => {
+      const r = el.getBoundingClientRect();
+      const cx = Math.round(r.left + r.width / 2);
+      const cy = Math.round(r.top + r.height / 2);
+      el.dispatchEvent(new PointerEvent('pointerdown', { button: 0, pointerId: 1, clientX: cx, clientY: cy, bubbles: true }));
+      window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, clientX: cx, clientY: cy, bubbles: true }));
+    };
+    // If the object lives on a non-active board, focus that board first so the
+    // toolbar and selection agree. The inspector drops its selection when the
+    // active board changes, so defer the select a frame to land after that.
+    const board = el.closest<HTMLElement>('[data-ox-board]');
+    if (board) {
+      const boards = Array.from(document.querySelectorAll<HTMLElement>('.ox-canvas [data-ox-board]'));
+      const idx = boards.indexOf(board);
+      if (idx >= 0 && idx !== activeBoard) {
+        onFocusBoard(idx);
+        requestAnimationFrame(fire);
+        return;
+      }
+    }
+    fire();
   };
 
   return (
@@ -214,9 +245,9 @@ export function LayersPanel({
       </div>
       <ul className="ox-layers-objs">
         {rows.length === 0 ? <li className="ox-layers-empty">No objects yet</li> : null}
-        {rows.map((r, i) => (
+        {rows.map((r) => (
           <li
-            key={i}
+            key={r.key}
             ref={r.el === selectedEl ? selectedRowRef : undefined}
             className={`${r.type === 'group' ? 'is-group' : r.depth > 0 ? 'is-child' : ''}${r.el === selectedEl ? ' is-selected' : ''}`.trim() || undefined}
             style={{ paddingLeft: 10 + r.depth * 16 }}
