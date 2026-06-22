@@ -20,8 +20,10 @@ const NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 // Real SVG/HTML event-handler attribute names. An allowlist (vs a generic
 // /on\w+=/) matches QUOTED and UNQUOTED values — `onload=alert(1)` as well as
 // `onload="…"` — without false-tripping on prose like "online = active".
+// Leading [\s/] not just \s: browsers accept `/` as a tag-name→attribute
+// separator, so `<svg/onload=…>` must be caught too.
 const SVG_EVENT_ATTR =
-  /\son(?:load|error|click|dblclick|abort|activate|begin|end|repeat|focus(?:in|out)?|blur|change|input|submit|reset|select|scroll|resize|unload|zoom|toggle|show|wheel|copy|cut|paste|contextmenu|key(?:down|up|press)|mouse(?:down|up|over|out|move|enter|leave|wheel)|pointer[a-z]+|touch[a-z]+|drag[a-z]*|drop|animation[a-z]+|transition[a-z]+|canplay[a-z]*|playing|play|pause|seek(?:ing|ed)|durationchange|timeupdate|volumechange|ratechange|progress|loadstart|loadeddata|loadedmetadata|stalled|suspend|waiting|emptied|ended|cuechange|invalid|formdata|hashchange|beforeunload|auxclick)\s*=/i;
+  /[\s/]on(?:load|error|click|dblclick|abort|activate|begin|end|repeat|focus(?:in|out)?|blur|change|input|submit|reset|select|scroll|resize|unload|zoom|toggle|show|wheel|copy|cut|paste|contextmenu|key(?:down|up|press)|mouse(?:down|up|over|out|move|enter|leave|wheel)|pointer[a-z]+|touch[a-z]+|drag[a-z]*|drop|animation[a-z]+|transition[a-z]+|canplay[a-z]*|playing|play|pause|seek(?:ing|ed)|durationchange|timeupdate|volumechange|ratechange|progress|loadstart|loadeddata|loadedmetadata|stalled|suspend|waiting|emptied|ended|cuechange|invalid|formdata|hashchange|beforeunload|auxclick)\s*=/i;
 
 function validName(name: string): boolean {
   if (!NAME_RE.test(name) || name.includes('..')) return false;
