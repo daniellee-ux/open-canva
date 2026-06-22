@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Guidance for **any** coding agent (Claude Code, OpenAI Codex, Cursor, Copilot, …) working in this OpenCanva project. `CLAUDE.md` is a copy of this file; **`AGENTS.md` is the source** — if you edit it, run `cp AGENTS.md CLAUDE.md` to keep them in sync.
+Guidance for **any** coding agent (Claude Code, OpenAI Codex, Cursor, Copilot, …) working in this OpenCanva project. `CLAUDE.md` is a copy of this file; **`AGENTS.md` is the source** — if you edit it, copy its contents over `CLAUDE.md` to keep the two in sync.
 
 This is an **OpenCanva** workspace: each design is a React component under `designs/<id>/index.tsx`, rendered on a zoomable canvas, edited by clicking objects (the edit lands back in the source), and exported to PNG / SVG / PDF.
 

@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@opencanva/core": "0.0.0",
+    "@opencanva/core": "^0.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

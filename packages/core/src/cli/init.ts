@@ -88,16 +88,16 @@ export async function init(targetArg?: string): Promise<void> {
     }
   }
 
-  // Pin @opencanva/core to the EXACT version of the CLI doing the scaffold, so the
-  // dependency always matches the version that produced the project (a caret on a
-  // 0.0.x version resolves to that exact version anyway).
+  // Pin @opencanva/core with a caret on the scaffolding CLI's version: for a 0.0.x
+  // version a caret resolves to that exact version anyway, and once core is >=0.1.0
+  // the scaffolded project picks up patch/minor fixes instead of freezing.
   const corePkg = JSON.parse(readFileSync(fileURLToPath(new URL('../../package.json', import.meta.url)), 'utf8')) as {
     version: string;
   };
   const projPkgPath = path.join(target, 'package.json');
   const projPkg = JSON.parse(readFileSync(projPkgPath, 'utf8')) as { dependencies?: Record<string, string> };
   if (projPkg.dependencies?.['@opencanva/core']) {
-    projPkg.dependencies['@opencanva/core'] = corePkg.version;
+    projPkg.dependencies['@opencanva/core'] = `^${corePkg.version}`;
     writeFileSync(projPkgPath, `${JSON.stringify(projPkg, null, 2)}\n`);
   }
 

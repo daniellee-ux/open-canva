@@ -6,7 +6,7 @@
 // hoisted monorepo node_modules, so it can't catch a dropped/mistyped template
 // dependency — this can.
 import { execSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -24,6 +24,16 @@ try {
   const proj = path.join(tmp, 'project');
 
   run(`node ${path.join(ROOT, 'packages/core/bin/opencanva.mjs')} init ${proj}`, ROOT);
+
+  // Validate the version spec init actually wrote (before we override it for install),
+  // so a broken pin in init's rewrite path is caught even though the install must use
+  // the local tarball.
+  const coreVersion = JSON.parse(readFileSync(path.join(ROOT, 'packages/core/package.json'), 'utf8')).version;
+  const wrote = JSON.parse(readFileSync(path.join(proj, 'package.json'), 'utf8')).dependencies?.['@opencanva/core'];
+  if (wrote !== `^${coreVersion}`) {
+    throw new Error(`init pinned @opencanva/core="${wrote}", expected "^${coreVersion}"`);
+  }
+
   // The scaffold pins @opencanva/core to the (unpublished) CLI version; point it at
   // the packed tarball so npm can resolve it, then install the rest from the registry.
   run(`npm pkg set "dependencies.@opencanva/core=file:${tgzAbs}"`, proj);
