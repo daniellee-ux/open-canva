@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build as viteBuild, createServer, preview as vitePreview } from 'vite';
@@ -52,9 +52,21 @@ export function copyBundledSkills(root: string): string[] {
 /** Copy the bundled agent skills into the workspace's skill dirs (both agent
  *  conventions), so the authoring knowledge is available to every agent. */
 export async function sync(): Promise<void> {
-  // Guard the footgun: bare `opencanva sync` at the framework monorepo root would
-  // write skills into the root instead of the demo workspace. Point to `npm run sync`.
-  if (existsSync(path.join(process.cwd(), 'packages', 'core', 'skills'))) {
+  // Guard the footgun: bare `opencanva sync` at THIS framework's monorepo root would
+  // write skills into the root instead of the demo workspace. Match precisely (the
+  // skills source + the root package name) so a user project can't trip it.
+  const rootPkg = path.join(process.cwd(), 'package.json');
+  const isFrameworkRoot =
+    existsSync(path.join(process.cwd(), 'packages', 'core', 'skills')) &&
+    existsSync(rootPkg) &&
+    (() => {
+      try {
+        return (JSON.parse(readFileSync(rootPkg, 'utf8')) as { name?: string }).name === 'opencanva';
+      } catch {
+        return false;
+      }
+    })();
+  if (isFrameworkRoot) {
     console.error('Refusing to sync at the framework monorepo root — run `npm run sync` (it targets apps/demo).');
     process.exitCode = 1;
     return;

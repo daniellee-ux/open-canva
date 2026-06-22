@@ -27,7 +27,11 @@ export async function init(targetArg?: string): Promise<void> {
   // Refuse to scaffold over real content (any entry except a fresh-repo allowlist —
   // including dotfiles like .env, so we don't silently clobber a configured dir).
   if (existsSync(target) && readdirSync(target).some((n) => !SCAFFOLD_OK_ENTRIES.has(n))) {
-    console.error(`Target directory is not empty: ${target}\nPass an empty or new directory: opencanva init <dir>`);
+    if (existsSync(path.join(target, 'opencanva.config.ts'))) {
+      console.error(`${target} already looks like an OpenCanva project. To refresh the bundled skills, run \`npm run sync\` there.`);
+    } else {
+      console.error(`Target directory is not empty: ${target}\nPass an empty or new directory: opencanva init <dir>`);
+    }
     process.exit(1);
   }
   mkdirSync(target, { recursive: true });
@@ -70,7 +74,25 @@ export async function init(targetArg?: string): Promise<void> {
     writeFileSync(projPkgPath, `${JSON.stringify(projPkg, null, 2)}\n`);
   }
 
-  // Install the bundled skills into both agent conventions.
+  // CLAUDE.md → AGENTS.md so every agent's conventional entry point resolves to one
+  // source. Done BEFORE the skills copy so that if that fails, the recovery hint
+  // (`npm run sync`, which only installs skills) still leaves a complete project.
+  // Fall back to a plain copy on filesystems without symlink support (e.g. Windows).
+  rmSync(path.join(target, 'CLAUDE.md'), { force: true });
+  try {
+    symlinkSync('AGENTS.md', path.join(target, 'CLAUDE.md'));
+  } catch {
+    // Mark the copy so it isn't mistaken for a separately-maintained file as AGENTS.md evolves.
+    const agents = readFileSync(path.join(target, 'AGENTS.md'), 'utf8');
+    writeFileSync(
+      path.join(target, 'CLAUDE.md'),
+      `<!-- Copy of AGENTS.md (symlinks unsupported here) — AGENTS.md is the source; keep this in sync. -->\n\n${agents}`,
+    );
+    console.warn('Note: created CLAUDE.md as a copy of AGENTS.md (symlinks unsupported); keep them in sync.');
+  }
+
+  // Install the bundled skills last, so a copy failure leaves an otherwise-complete
+  // project that the printed `npm run sync` can finish.
   let names: string[];
   try {
     names = copyBundledSkills(target);
@@ -78,23 +100,6 @@ export async function init(targetArg?: string): Promise<void> {
     console.error(`Project files were created, but installing skills failed: ${String((err as Error)?.message ?? err)}`);
     console.error(`Run \`npm run sync\` in ${target} to finish.`);
     process.exit(1);
-  }
-
-  // CLAUDE.md → AGENTS.md so every agent's conventional entry point resolves to one
-  // source. Clear any copied/leftover CLAUDE.md first, then symlink — falling back to
-  // a plain copy on filesystems without symlink support (e.g. Windows without dev mode).
-  rmSync(path.join(target, 'CLAUDE.md'), { force: true });
-  try {
-    symlinkSync('AGENTS.md', path.join(target, 'CLAUDE.md'));
-  } catch {
-    // No symlink support (e.g. Windows without dev mode): copy, but mark it so the
-    // copy isn't mistaken for a separately-maintained file as AGENTS.md evolves.
-    const agents = readFileSync(path.join(target, 'AGENTS.md'), 'utf8');
-    writeFileSync(
-      path.join(target, 'CLAUDE.md'),
-      `<!-- Copy of AGENTS.md (symlinks unsupported here) — AGENTS.md is the source; keep this in sync. -->\n\n${agents}`,
-    );
-    console.warn('Note: created CLAUDE.md as a copy of AGENTS.md (symlinks unsupported); keep them in sync.');
   }
 
   const rel = path.relative(process.cwd(), target) || '.';
