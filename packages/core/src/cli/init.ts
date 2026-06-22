@@ -44,11 +44,12 @@ export async function init(targetArg?: string): Promise<void> {
       // Keep the user's existing .gitignore but append any template rules it lacks
       // (notably `.claude/`, so the regenerated Claude skills aren't committed).
       const existing = readFileSync(dotGi, 'utf8');
-      const have = new Set(existing.split('\n').map((l) => l.trim()));
+      const norm = (l: string) => l.replace(/\/+$/, ''); // treat `.claude` and `.claude/` as one rule
+      const have = new Set(existing.split('\n').map((l) => norm(l.trim())));
       const add = readFileSync(gi, 'utf8')
         .split('\n')
         .map((l) => l.trim())
-        .filter((l) => l && !l.startsWith('#') && !have.has(l));
+        .filter((l) => l && !l.startsWith('#') && !have.has(norm(l)));
       if (add.length) writeFileSync(dotGi, `${existing.replace(/\n*$/, '')}\n\n# Added by opencanva init\n${add.join('\n')}\n`);
       rmSync(gi);
     } else {
@@ -86,7 +87,14 @@ export async function init(targetArg?: string): Promise<void> {
   try {
     symlinkSync('AGENTS.md', path.join(target, 'CLAUDE.md'));
   } catch {
-    cpSync(path.join(target, 'AGENTS.md'), path.join(target, 'CLAUDE.md'));
+    // No symlink support (e.g. Windows without dev mode): copy, but mark it so the
+    // copy isn't mistaken for a separately-maintained file as AGENTS.md evolves.
+    const agents = readFileSync(path.join(target, 'AGENTS.md'), 'utf8');
+    writeFileSync(
+      path.join(target, 'CLAUDE.md'),
+      `<!-- Copy of AGENTS.md (symlinks unsupported here) — AGENTS.md is the source; keep this in sync. -->\n\n${agents}`,
+    );
+    console.warn('Note: created CLAUDE.md as a copy of AGENTS.md (symlinks unsupported); keep them in sync.');
   }
 
   const rel = path.relative(process.cwd(), target) || '.';

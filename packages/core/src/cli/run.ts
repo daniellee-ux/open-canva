@@ -35,12 +35,14 @@ export function copyBundledSkills(root: string): string[] {
   const names = readdirSync(skillsSrc).filter((n) => !n.startsWith('.'));
   for (const rel of SKILL_DIRS) {
     const dest = path.join(root, ...rel.split('/'));
-    // Mirror, don't merge: wipe the skills dir first so a skill renamed/removed
-    // upstream doesn't leave a stale copy behind (which would fail `check:sync`).
-    // Scoped to the skills dir — never the parent .agents/.claude.
-    rmSync(dest, { recursive: true, force: true });
     mkdirSync(dest, { recursive: true });
     for (const name of names) {
+      // Replace each bundled skill in full (so a file removed upstream doesn't
+      // linger), but NEVER touch other entries — a user may keep their own skills
+      // in this dir. (A bundled skill that's renamed/removed upstream leaves its
+      // old dir behind; for the committed demo copy, `check:sync` flags it so a
+      // maintainer can remove it — we don't auto-delete unknown dirs.)
+      rmSync(path.join(dest, name), { recursive: true, force: true });
       cpSync(path.join(skillsSrc, name), path.join(dest, name), { recursive: true });
     }
   }
