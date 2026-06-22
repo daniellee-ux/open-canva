@@ -104,6 +104,16 @@ if (existsSync(lockPath)) {
       ok(`skills-lock: ${name} hash matches`);
     }
   }
+  // Reverse: every vendored skill dir must be recorded in the lock (no unlocked skills).
+  const vendoredRoot = path.join(ROOT, '.agents/skills');
+  if (existsSync(vendoredRoot)) {
+    const locked = new Set(Object.keys(lock.skills ?? {}));
+    for (const e of readdirSync(vendoredRoot, { withFileTypes: true })) {
+      if (e.isDirectory() && !locked.has(e.name)) {
+        fail(`skills-lock: .agents/skills/${e.name} is vendored but not recorded in skills-lock.json`);
+      }
+    }
+  }
 }
 
 if (failed) {

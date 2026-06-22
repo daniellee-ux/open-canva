@@ -37,3 +37,6 @@ jobs:
 
       - name: Check committed skills/template/lockfile are in sync
         run: npm run check:sync
+
+      - name: Validate the init template installs + typechecks in isolation
+        run: node scripts/check-template-scaffold.mjs
