@@ -7,7 +7,8 @@
     "dev": "opencanva dev",
     "build": "opencanva build",
     "preview": "opencanva preview",
-    "sync": "opencanva sync"
+    "sync": "opencanva sync",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@opencanva/core": "0.0.0",
