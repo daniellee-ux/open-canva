@@ -40,7 +40,14 @@ function expectEqual(a, b, label) {
   const fa = listFiles(a);
   const fb = listFiles(b);
   if (fa.join('\n') !== fb.join('\n')) {
-    fail(`${label}: file lists differ`);
+    const setA = new Set(fa);
+    const setB = new Set(fb);
+    const stale = fb.filter((f) => !setA.has(f)); // present in the committed copy, gone from source
+    const missing = fa.filter((f) => !setB.has(f)); // in source, not yet copied
+    const detail = [stale.length && `stale (remove): ${stale.join(', ')}`, missing.length && `missing (run sync): ${missing.join(', ')}`]
+      .filter(Boolean)
+      .join('; ');
+    fail(`${label}: file lists differ — ${detail}`);
     return;
   }
   for (const f of fa) {
