@@ -275,7 +275,11 @@ export function Inspector({
   // second control doesn't cancel the first's pending source write.
   const typeTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const commentTextRef = useRef<HTMLTextAreaElement>(null);
-  const textAreaRef = useRef<HTMLTextAreaElement>(null);
+  // Track whether the user has unsaved typing in the text / comment fields, so an
+  // HMR rebind refreshes a CLEAN field (no stale Save over an external edit) but
+  // never clobbers an in-progress edit.
+  const textDirtyRef = useRef(false);
+  const commentDirtyRef = useRef(false);
 
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
@@ -409,6 +413,8 @@ export function Inspector({
       setHovBox(null);
       setText((el.textContent ?? '').replace(/\s+/g, ' ').trim());
       setComment(existingCommentFor(el)); // pre-fill so a left comment is viewable
+      textDirtyRef.current = false;
+      commentDirtyRef.current = false;
       onSelectionChange?.(src, el);
     },
     [onSelectionChange, existingCommentFor],
@@ -455,6 +461,8 @@ export function Inspector({
       setExtra(rest);
       setText((first.el.textContent ?? '').replace(/\s+/g, ' ').trim());
       setComment(existingCommentFor(first.el));
+      textDirtyRef.current = false;
+      commentDirtyRef.current = false;
       const { rect, box } = boxOf(first.el, zoomRef.current || 1);
       setSelRect(rect);
       setSelBox(box);
@@ -944,15 +952,11 @@ export function Inspector({
     setSel(primary);
     setExtra(nextExtra);
     // Refresh the popover fields from the freshly-mounted node, so an external edit
-    // (e.g. apply-comments rewriting a <Text>) isn't overwritten by a stale Save.
-    // But never clobber a field the user is actively typing in — an HMR triggered by
-    // a sibling control (size slider, color swatch) bumps revision mid-edit too.
-    if (textAreaRef.current !== document.activeElement) {
-      setText((primary.el.textContent ?? '').replace(/\s+/g, ' ').trim());
-    }
-    if (commentTextRef.current !== document.activeElement) {
-      setComment(existingCommentFor(primary.el));
-    }
+    // (e.g. apply-comments rewriting a <Text>) isn't overwritten by a stale Save —
+    // but skip a field with unsaved typing so a sibling-control HMR can't clobber an
+    // in-progress edit. (A clean field always refreshes, even while focused.)
+    if (!textDirtyRef.current) setText((primary.el.textContent ?? '').replace(/\s+/g, ' ').trim());
+    if (!commentDirtyRef.current) setComment(existingCommentFor(primary.el));
     onSelectionChange?.(primary.src, primary.el); // keep the layers-panel highlight bound to the new node
     reflow();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1027,6 +1031,7 @@ export function Inspector({
     if (!s?.src) return;
     try {
       await post('/__ox/edit', { rel: s.src.rel, line: s.src.line, column: s.src.column, op: 'text', payload: { text } });
+      textDirtyRef.current = false; // saved → the field now mirrors the node
       flash({ kind: 'ok', msg: `Text → ${s.src.rel.split('/').slice(-1)[0]}:${s.src.line}` });
     } catch (err) {
       flash({ kind: 'err', msg: String((err as Error).message ?? err) });
@@ -1158,6 +1163,7 @@ export function Inspector({
       const data = await post('/__ox/comment', { rel: s.src.rel, line: s.src.line, column: s.src.column, text: comment.trim() });
       flash({ kind: 'ok', msg: `Comment → ${data.rel.split('/').slice(-1)[0]}:${data.line}` });
       setComment('');
+      commentDirtyRef.current = false;
       setCommentNonce((n) => n + 1);
     } catch (err) {
       flash({ kind: 'err', msg: String((err as Error).message ?? err) });
@@ -1360,7 +1366,7 @@ export function Inspector({
             {sel.type === 'text' || sel.type === 'icon' ? (
               <>
                 <label className="ox-pop-label">Text</label>
-                <textarea ref={textAreaRef} className="ox-pop-text" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') saveText(); }} />
+                <textarea className="ox-pop-text" value={text} onChange={(e) => { setText(e.target.value); textDirtyRef.current = true; }} onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') saveText(); }} />
                 <div className="ox-pop-actions">
                   <button type="button" className="ox-pop-btn ox-pop-btn--primary" disabled={!sel.src} onClick={saveText}>Save text</button>
                 </div>
@@ -1564,7 +1570,7 @@ export function Inspector({
             </div>
 
             <label className="ox-pop-label">Comment for the agent</label>
-            <textarea ref={commentTextRef} className="ox-pop-text" value={comment} placeholder="e.g. “make this headline pop more”" onChange={(e) => setComment(e.target.value)} onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') runComment(); }} />
+            <textarea ref={commentTextRef} className="ox-pop-text" value={comment} placeholder="e.g. “make this headline pop more”" onChange={(e) => { setComment(e.target.value); commentDirtyRef.current = true; }} onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') runComment(); }} />
             <div className="ox-pop-actions">
               <button type="button" className="ox-pop-btn" onClick={deselect}>Close</button>
               <button type="button" className="ox-pop-btn ox-pop-btn--primary" disabled={!sel.src || !comment.trim()} onClick={runComment}>{existingCommentFor(sel.el) ? 'Update comment' : 'Add comment'}</button>
