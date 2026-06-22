@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build as viteBuild, createServer, preview as vitePreview } from 'vite';
@@ -35,6 +35,10 @@ export function copyBundledSkills(root: string): string[] {
   const names = readdirSync(skillsSrc).filter((n) => !n.startsWith('.'));
   for (const rel of SKILL_DIRS) {
     const dest = path.join(root, ...rel.split('/'));
+    // Mirror, don't merge: wipe the skills dir first so a skill renamed/removed
+    // upstream doesn't leave a stale copy behind (which would fail `check:sync`).
+    // Scoped to the skills dir — never the parent .agents/.claude.
+    rmSync(dest, { recursive: true, force: true });
     mkdirSync(dest, { recursive: true });
     for (const name of names) {
       cpSync(path.join(skillsSrc, name), path.join(dest, name), { recursive: true });
@@ -46,6 +50,13 @@ export function copyBundledSkills(root: string): string[] {
 /** Copy the bundled agent skills into the workspace's skill dirs (both agent
  *  conventions), so the authoring knowledge is available to every agent. */
 export async function sync(): Promise<void> {
+  // Guard the footgun: bare `opencanva sync` at the framework monorepo root would
+  // write skills into the root instead of the demo workspace. Point to `npm run sync`.
+  if (existsSync(path.join(process.cwd(), 'packages', 'core', 'skills'))) {
+    console.error('Refusing to sync at the framework monorepo root — run `npm run sync` (it targets apps/demo).');
+    process.exitCode = 1;
+    return;
+  }
   try {
     const names = copyBundledSkills(process.cwd());
     console.log(`Synced ${names.length} skills → ${SKILL_DIRS.join(' + ')}/ (${names.join(', ')})`);

@@ -37,12 +37,23 @@ export async function init(targetArg?: string): Promise<void> {
     cpSync(path.join(templateSrc, entry), path.join(target, entry), { recursive: true });
   }
   // npm strips a packaged `.gitignore`, so the template ships it as `gitignore`.
-  // Don't clobber a .gitignore the target already had (e.g. a cloned starter repo).
   const gi = path.join(target, 'gitignore');
   const dotGi = path.join(target, '.gitignore');
   if (existsSync(gi)) {
-    if (existsSync(dotGi)) rmSync(gi);
-    else renameSync(gi, dotGi);
+    if (existsSync(dotGi)) {
+      // Keep the user's existing .gitignore but append any template rules it lacks
+      // (notably `.claude/`, so the regenerated Claude skills aren't committed).
+      const existing = readFileSync(dotGi, 'utf8');
+      const have = new Set(existing.split('\n').map((l) => l.trim()));
+      const add = readFileSync(gi, 'utf8')
+        .split('\n')
+        .map((l) => l.trim())
+        .filter((l) => l && !l.startsWith('#') && !have.has(l));
+      if (add.length) writeFileSync(dotGi, `${existing.replace(/\n*$/, '')}\n\n# Added by opencanva init\n${add.join('\n')}\n`);
+      rmSync(gi);
+    } else {
+      renameSync(gi, dotGi);
+    }
   }
 
   // Pin @opencanva/core to the EXACT version of the CLI doing the scaffold, so the
@@ -59,7 +70,14 @@ export async function init(targetArg?: string): Promise<void> {
   }
 
   // Install the bundled skills into both agent conventions.
-  const names = copyBundledSkills(target);
+  let names: string[];
+  try {
+    names = copyBundledSkills(target);
+  } catch (err) {
+    console.error(`Project files were created, but installing skills failed: ${String((err as Error)?.message ?? err)}`);
+    console.error(`Run \`npm run sync\` in ${target} to finish.`);
+    process.exit(1);
+  }
 
   // CLAUDE.md → AGENTS.md so every agent's conventional entry point resolves to one
   // source. Clear any copied/leftover CLAUDE.md first, then symlink — falling back to
@@ -80,4 +98,6 @@ export async function init(targetArg?: string): Promise<void> {
   if (rel !== '.') console.log(`  cd ${rel}`);
   console.log('  npm install');
   console.log('  npm run dev      # → http://localhost:5173');
+  console.log(`\n(npm install needs @opencanva/core@${corePkg.version} on the registry; until it's`);
+  console.log("published, run `npm link @opencanva/core` from a local checkout.)");
 }
