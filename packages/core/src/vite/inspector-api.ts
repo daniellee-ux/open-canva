@@ -466,19 +466,22 @@ export function inspectorApiPlugin(opts: { userCwd: string; designsRoot: string;
           .then((body) => {
             const edits = Array.isArray(body?.edits) ? body.edits : [];
             if (!edits.length) return json(res, 400, { error: 'No edits' });
-            const byRel = new Map<string, any[]>();
+            // Group by the RESOLVED absolute path (not the raw `rel` string) so two
+            // different spellings of the same file fold into one group — otherwise
+            // they'd splice the same on-disk text twice, clobbering each other.
+            const byAbs = new Map<string, any[]>();
             for (const e of edits) {
-              if (!byRel.has(e.rel)) byRel.set(e.rel, []);
-              byRel.get(e.rel)?.push(e);
+              const abs = resolveDesignFile(e.rel);
+              if (!abs) return json(res, 403, { error: `Not an editable design file: ${e.rel}` });
+              if (!byAbs.has(abs)) byAbs.set(abs, []);
+              byAbs.get(abs)?.push(e);
             }
             // Pass 1: compute + validate every file's next text WITHOUT writing, so a
             // batch spanning two files can't half-apply (file 1 written, file 2 rejected,
             // leaving the source inconsistent). Only if all files pass do we write (pass 2).
             const planned: { abs: string; next: string }[] = [];
             let dropped = 0; // edits collapsed because two nodes mapped to one source element
-            for (const [rel, fileEdits] of byRel) {
-              const abs = resolveDesignFile(rel);
-              if (!abs) return json(res, 403, { error: `Not an editable design file: ${rel}` });
+            for (const [abs, fileEdits] of byAbs) {
               const code = readFileSync(abs, 'utf8');
               const els = collectElements(parseFile(abs));
               const splices: { start: number; end: number; text: string }[] = [];
@@ -525,13 +528,11 @@ export function inspectorApiPlugin(opts: { userCwd: string; designsRoot: string;
               if (!wouldParse(next)) return json(res, 422, { error: 'Batch edit would break the file; not written.' });
               planned.push({ abs, next });
             }
-            // Pass 2: every file validated — commit them. (Each file is its own undo
-            // entry; the common single-file batch is one Cmd+Z, as before.)
-            const written = planned.map((p) => {
-              applyWrite(p.abs, p.next);
-              return path.relative(userCwd, p.abs);
-            });
-            json(res, 200, { ok: true, files: written, dropped });
+            // Pass 2: every file validated — commit them as ONE transaction so a
+            // single Cmd+Z reverts the whole batch together, even across files.
+            undoStack.applyBatch(planned);
+            const written = planned.map((p) => path.relative(userCwd, p.abs));
+            json(res, 200, { ok: true, files: written, dropped, ...depths() });
           })
           .catch((err) => json(res, 500, { error: String(err?.message ?? err) }));
       });
@@ -645,7 +646,7 @@ export function inspectorApiPlugin(opts: { userCwd: string; designsRoot: string;
         if (!guard(req, res)) return;
         const r = undoStack.undo();
         if (!r) return json(res, 200, { ok: false, empty: true, ...depths() });
-        json(res, 200, { ok: true, file: path.relative(userCwd, r.file), ...depths() });
+        json(res, 200, { ok: true, file: r.files.map((f) => path.relative(userCwd, f)).join(', '), ...depths() });
       });
 
       server.middlewares.use('/__ox/redo', (req, res, next) => {
@@ -653,7 +654,7 @@ export function inspectorApiPlugin(opts: { userCwd: string; designsRoot: string;
         if (!guard(req, res)) return;
         const r = undoStack.redo();
         if (!r) return json(res, 200, { ok: false, empty: true, ...depths() });
-        json(res, 200, { ok: true, file: path.relative(userCwd, r.file), ...depths() });
+        json(res, 200, { ok: true, file: r.files.map((f) => path.relative(userCwd, f)).join(', '), ...depths() });
       });
 
       // Lists pending @canva-comment / data-ox-comment markers in a design, so the
