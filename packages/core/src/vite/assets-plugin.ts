@@ -49,7 +49,9 @@ function contentMatchesExt(ext: string, b: Buffer): boolean {
       return ascii(4, 8) === 'ftyp' && /avif|avis|mif1|miaf/.test(ascii(8, 24));
     case 'svg': {
       const head = b
-        .subarray(0, 2048)
+        // Scan a generous head window so a large leading comment/license block can't
+        // push the <svg> root out of range and trip a false reject.
+        .subarray(0, 8192)
         .toString('utf8')
         .replace(/^\uFEFF/, "")
         // Strip a leading XML declaration, processing instructions, comments, and
@@ -58,8 +60,15 @@ function contentMatchesExt(ext: string, b: Buffer): boolean {
         .replace(/^(?:<!--[\s\S]*?-->|<\?[\s\S]*?\?>|\s)+/, '')
         .toLowerCase();
       if (!(head.startsWith('<svg') || head.startsWith('<!doctype svg'))) return false;
+      // Defense in depth (assets render via <img>, a non-executing context): reject
+      // inline <script>, an event-handler attribute, or a javascript: URI in an
+      // attribute. Anchor to attribute syntax so ordinary text doesn't false-trip.
       const full = b.toString('utf8');
-      return !/<script[\s/>]/i.test(full) && !/\son\w+\s*=/i.test(full) && !/javascript:/i.test(full);
+      return (
+        !/<script[\s/>]/i.test(full) &&
+        !/\son[a-z]+\s*=\s*["']/i.test(full) &&
+        !/(?:href|src|xlink:href)\s*=\s*["']?\s*javascript:/i.test(full)
+      );
     }
     default:
       return false;
