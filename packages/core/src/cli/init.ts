@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { copyBundledSkills } from './run';
@@ -92,22 +92,13 @@ export async function init(targetArg?: string): Promise<void> {
     writeFileSync(projPkgPath, `${JSON.stringify(projPkg, null, 2)}\n`);
   }
 
-  // CLAUDE.md → AGENTS.md so every agent's conventional entry point resolves to one
-  // source. Done BEFORE the skills copy so that if that fails, the recovery hint
-  // (`npm run sync`, which only installs skills) still leaves a complete project.
-  // Fall back to a plain copy on filesystems without symlink support (e.g. Windows).
+  // CLAUDE.md is a byte-identical COPY of AGENTS.md, not a symlink — a committed
+  // symlink degrades to a 9-byte "AGENTS.md" text file when the user's project is
+  // later cloned on a no-symlink/Windows checkout, leaving Claude Code with no
+  // guidance. A copy resolves to the real guidance on every platform. (Done before
+  // the skills copy so a skills failure still leaves a complete project.)
   rmSync(path.join(target, 'CLAUDE.md'), { force: true });
-  try {
-    symlinkSync('AGENTS.md', path.join(target, 'CLAUDE.md'));
-  } catch {
-    // Mark the copy so it isn't mistaken for a separately-maintained file as AGENTS.md evolves.
-    const agents = readFileSync(path.join(target, 'AGENTS.md'), 'utf8');
-    writeFileSync(
-      path.join(target, 'CLAUDE.md'),
-      `<!-- Copy of AGENTS.md (symlinks unsupported here) — AGENTS.md is the source; keep this in sync. -->\n\n${agents}`,
-    );
-    console.warn('Note: created CLAUDE.md as a copy of AGENTS.md (symlinks unsupported); keep them in sync.');
-  }
+  cpSync(path.join(target, 'AGENTS.md'), path.join(target, 'CLAUDE.md'));
 
   // Install the bundled skills last, so a copy failure leaves an otherwise-complete
   // project that the printed `npm run sync` can finish.
@@ -124,7 +115,7 @@ export async function init(targetArg?: string): Promise<void> {
   const where = targetArg && targetArg !== '.' ? targetArg : target;
   const inPlace = !targetArg || targetArg === '.';
   console.log(`\nScaffolded an OpenCanva project in ${where}`);
-  console.log('  • AGENTS.md + CLAUDE.md (symlink)');
+  console.log('  • AGENTS.md (+ CLAUDE.md copy)');
   console.log(`  • ${names.length} skills → .agents/skills/ + .claude/skills/`);
   console.log('  • designs/start-here/');
   console.log('\nNext:');
