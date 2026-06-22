@@ -49,14 +49,14 @@ export default [Poster] satisfies Scene[];
 
 - **Click-to-source.** Every object you click resolves to the exact `<Box>`/`<Text>` in your source (via injected `data-ox-loc` read off the React fiber — works across files and components). Drag/resize/recolor rewrite the object's props **in place** through a dev-only write-back API; the source stays byte-stable so HMR is surgical.
 - **Comments → edits.** Leave a `@canva-comment` on any object; the bundled `apply-comments` skill applies them.
-- **Cursor.** The dev server writes `.opencanva/current.json` so an agent can resolve "this design / the object I selected".
-- **Skills.** `opencanva sync` copies the bundled agent skills into `.claude/skills/`: `create-design`, `canva-authoring`, `apply-comments`, `current-design`, `create-theme`.
+- **Current-design pointer.** The dev server writes `.opencanva/current.json` so an agent can resolve "this design / the object I selected".
+- **Works with any agent.** A root `AGENTS.md` (the cross-tool standard read by Codex, Cursor, Copilot, …) carries the repo guide, and `CLAUDE.md` symlinks to it. The authoring skills — `canva-authoring`, `create-design`, `apply-comments`, `current-design`, `create-theme` — ship as Agent Skills: `opencanva sync` copies them into both `.agents/skills/` (vendor-neutral, committed) and `.claude/skills/` (local). `opencanva init` scaffolds a new project with all of it baked in.
 
 ## Layout
 
 ```
-packages/core      @opencanva/core — runtime, Vite plugin, CLI, primitives, skills
-apps/demo          example designs (summer-sale, quote-card, webinar-promo, brand-carousel)
+packages/core      @opencanva/core — runtime, Vite plugin, CLI, primitives, skills, project template
+apps/demo          demo workspace — ships the start-here starter; your own designs stay local
 ```
 
-`opencanva <dev|build|preview|sync>` runs the TypeScript CLI directly via `tsx` — no build step.
+`opencanva <dev|build|preview|sync|init>` runs the TypeScript CLI directly via `tsx` — no build step.
