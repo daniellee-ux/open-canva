@@ -275,6 +275,7 @@ export function Inspector({
   // second control doesn't cancel the first's pending source write.
   const typeTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const commentTextRef = useRef<HTMLTextAreaElement>(null);
+  const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
@@ -944,8 +945,14 @@ export function Inspector({
     setExtra(nextExtra);
     // Refresh the popover fields from the freshly-mounted node, so an external edit
     // (e.g. apply-comments rewriting a <Text>) isn't overwritten by a stale Save.
-    setText((primary.el.textContent ?? '').replace(/\s+/g, ' ').trim());
-    setComment(existingCommentFor(primary.el));
+    // But never clobber a field the user is actively typing in — an HMR triggered by
+    // a sibling control (size slider, color swatch) bumps revision mid-edit too.
+    if (textAreaRef.current !== document.activeElement) {
+      setText((primary.el.textContent ?? '').replace(/\s+/g, ' ').trim());
+    }
+    if (commentTextRef.current !== document.activeElement) {
+      setComment(existingCommentFor(primary.el));
+    }
     onSelectionChange?.(primary.src, primary.el); // keep the layers-panel highlight bound to the new node
     reflow();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1353,7 +1360,7 @@ export function Inspector({
             {sel.type === 'text' || sel.type === 'icon' ? (
               <>
                 <label className="ox-pop-label">Text</label>
-                <textarea className="ox-pop-text" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') saveText(); }} />
+                <textarea ref={textAreaRef} className="ox-pop-text" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') saveText(); }} />
                 <div className="ox-pop-actions">
                   <button type="button" className="ox-pop-btn ox-pop-btn--primary" disabled={!sel.src} onClick={saveText}>Save text</button>
                 </div>
