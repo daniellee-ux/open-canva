@@ -49,25 +49,33 @@ export function copyBundledSkills(root: string): string[] {
   return names;
 }
 
+/** True if `cwd` is anywhere inside THIS framework's monorepo (some ancestor
+ *  package.json is named "opencanva"). */
+function insideFrameworkRepo(cwd: string): boolean {
+  for (let d = cwd; ; ) {
+    const pkg = path.join(d, 'package.json');
+    if (existsSync(pkg)) {
+      try {
+        if ((JSON.parse(readFileSync(pkg, 'utf8')) as { name?: string }).name === 'opencanva') return true;
+      } catch {
+        /* ignore an unreadable package.json */
+      }
+    }
+    const parent = path.dirname(d);
+    if (parent === d) return false;
+    d = parent;
+  }
+}
+
 /** Copy the bundled agent skills into the workspace's skill dirs (both agent
  *  conventions), so the authoring knowledge is available to every agent. */
 export async function sync(): Promise<void> {
-  // Guard the footgun: bare `opencanva sync` at THIS framework's monorepo root would
-  // write skills into the root instead of the demo workspace. Match precisely (the
-  // skills source + the root package name) so a user project can't trip it.
-  const rootPkg = path.join(process.cwd(), 'package.json');
-  const isFrameworkRoot =
-    existsSync(path.join(process.cwd(), 'packages', 'core', 'skills')) &&
-    existsSync(rootPkg) &&
-    (() => {
-      try {
-        return (JSON.parse(readFileSync(rootPkg, 'utf8')) as { name?: string }).name === 'opencanva';
-      } catch {
-        return false;
-      }
-    })();
-  if (isFrameworkRoot) {
-    console.error('Refusing to sync at the framework monorepo root — run `npm run sync` (it targets apps/demo).');
+  // Guard the footgun: bare `opencanva sync` anywhere inside THIS framework's repo
+  // (root, packages/core, …) would write a stray skills tree there. Refuse unless
+  // the cwd is an actual workspace (has opencanva.config.ts, e.g. apps/demo). User
+  // projects aren't inside the framework repo, so this never trips them.
+  if (insideFrameworkRepo(process.cwd()) && !existsSync(path.join(process.cwd(), 'opencanva.config.ts'))) {
+    console.error('Refusing to sync here inside the OpenCanva monorepo — run `npm run sync` (it targets apps/demo).');
     process.exitCode = 1;
     return;
   }

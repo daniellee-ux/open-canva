@@ -13,6 +13,10 @@ const SCAFFOLD_OK_ENTRIES = new Set(['.git', '.gitignore', '.DS_Store']);
  * multi-agent ready out of the box.
  */
 export async function init(targetArg?: string): Promise<void> {
+  if (targetArg?.startsWith('-')) {
+    console.error('Usage: opencanva init [directory]');
+    process.exit(1);
+  }
   const templateSrc = fileURLToPath(new URL('../../template', import.meta.url));
   if (!existsSync(templateSrc)) {
     console.error('Project template not found in @opencanva/core.');
@@ -102,13 +106,15 @@ export async function init(targetArg?: string): Promise<void> {
     process.exit(1);
   }
 
-  const rel = path.relative(process.cwd(), target) || '.';
-  console.log(`\nScaffolded an OpenCanva project in ${rel}/`);
+  // Show what the user typed (or the absolute path), not a `../..`-relative path.
+  const where = targetArg && targetArg !== '.' ? targetArg : target;
+  const inPlace = !targetArg || targetArg === '.';
+  console.log(`\nScaffolded an OpenCanva project in ${where}`);
   console.log('  • AGENTS.md + CLAUDE.md (symlink)');
   console.log(`  • ${names.length} skills → .agents/skills/ + .claude/skills/`);
   console.log('  • designs/start-here/');
   console.log('\nNext:');
-  if (rel !== '.') console.log(`  cd ${rel}`);
+  if (!inPlace) console.log(`  cd ${where}`);
   console.log('  npm install');
   console.log('  npm run dev      # → http://localhost:5173');
   console.log(`\n(npm install needs @opencanva/core@${corePkg.version} on the registry; until it's`);
