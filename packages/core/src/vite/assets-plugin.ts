@@ -26,8 +26,11 @@ function validName(name: string): boolean {
 /**
  * Sniff the uploaded bytes against the claimed extension so arbitrary content
  * can't be stored under an image name (the file is served verbatim via /@fs).
- * Raster formats are checked by magic number; SVG must look like XML/SVG and
- * carry no inline <script> (its only top-level XSS vector here).
+ * Raster formats are checked by magic number. SVG must look like XML/SVG once any
+ * leading BOM / XML declaration / comments are stripped, and carries no inline
+ * <script>, event-handler attribute, or javascript: URI. (Safety today rests on
+ * every consumer rendering assets via <img> — a non-executing context; these
+ * checks are defense in depth should a future consumer inline the markup.)
  */
 function contentMatchesExt(ext: string, b: Buffer): boolean {
   const starts = (sig: number[]) => sig.length <= b.length && sig.every((v, i) => b[i] === v);
@@ -45,9 +48,18 @@ function contentMatchesExt(ext: string, b: Buffer): boolean {
     case 'avif':
       return ascii(4, 8) === 'ftyp' && /avif|avis|mif1|miaf/.test(ascii(8, 24));
     case 'svg': {
-      const head = b.subarray(0, 2048).toString('utf8').trimStart().toLowerCase();
-      if (!(head.startsWith('<?xml') || head.startsWith('<svg') || head.startsWith('<!doctype svg'))) return false;
-      return !/<script[\s/>]/i.test(b.toString('utf8'));
+      const head = b
+        .subarray(0, 2048)
+        .toString('utf8')
+        .replace(/^\uFEFF/, "")
+        // Strip a leading XML declaration, processing instructions, comments, and
+        // whitespace so a valid SVG that opens with a generator/license comment
+        // (Illustrator/optimizer output) still passes the root-element check.
+        .replace(/^(?:<!--[\s\S]*?-->|<\?[\s\S]*?\?>|\s)+/, '')
+        .toLowerCase();
+      if (!(head.startsWith('<svg') || head.startsWith('<!doctype svg'))) return false;
+      const full = b.toString('utf8');
+      return !/<script[\s/>]/i.test(full) && !/\son\w+\s*=/i.test(full) && !/javascript:/i.test(full);
     }
     default:
       return false;
@@ -229,6 +241,13 @@ export function assetsPlugin(opts: { designsRoot: string }): Plugin {
             if (!dest) return json(res, 400, { error: 'invalid target name' });
             if (!existsSync(loc.abs)) return json(res, 404, { error: 'not found' });
             if (existsSync(dest.abs)) return json(res, 409, { error: 'exists', name: to });
+            // A rename that changes the extension must still match the bytes, so a
+            // .png can't be relabeled .svg to slip past the upload content sniff.
+            const fromExt = path.extname(file).slice(1).toLowerCase();
+            const toExt = path.extname(to).slice(1).toLowerCase();
+            if (fromExt !== toExt && !contentMatchesExt(toExt, readFileSync(loc.abs))) {
+              return json(res, 415, { error: `File content does not match a .${toExt} image` });
+            }
             renameSync(loc.abs, dest.abs);
             changed(design);
             json(res, 200, { ok: true, asset: assetInfo(dest.dir, to) });
