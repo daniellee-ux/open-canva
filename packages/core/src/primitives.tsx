@@ -306,10 +306,14 @@ export function ImageObject({
         alt={alt}
         draggable={false}
         style={{
-          width: zoom && zoom !== 1 ? `${zoom * 100}%` : '100%',
-          height: zoom && zoom !== 1 ? `${zoom * 100}%` : '100%',
+          width: '100%',
+          height: '100%',
           objectFit: fit,
           objectPosition: focus,
+          // Zoom from the center (clipped by the container's overflow:hidden) rather
+          // than enlarging the element from its top-left, which drifted the crop.
+          transform: zoom && zoom !== 1 ? `scale(${zoom})` : undefined,
+          transformOrigin: 'center',
           display: 'block',
         }}
       />
