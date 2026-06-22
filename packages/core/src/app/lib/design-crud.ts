@@ -7,6 +7,11 @@ async function call(url: string, method: string, body?: unknown): Promise<any> {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+  // Writes that land on the shared undo stack (board/token/meta) return the new
+  // history depths; broadcast them so the inspector's Undo/Redo buttons stay synced.
+  if (typeof data.undo === 'number') {
+    window.dispatchEvent(new CustomEvent('opencanva:history', { detail: { undo: data.undo, redo: data.redo } }));
+  }
   return data;
 }
 

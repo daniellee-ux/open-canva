@@ -942,6 +942,10 @@ export function Inspector({
     extraRef.current = nextExtra;
     setSel(primary);
     setExtra(nextExtra);
+    // Refresh the popover fields from the freshly-mounted node, so an external edit
+    // (e.g. apply-comments rewriting a <Text>) isn't overwritten by a stale Save.
+    setText((primary.el.textContent ?? '').replace(/\s+/g, ' ').trim());
+    setComment(existingCommentFor(primary.el));
     onSelectionChange?.(primary.src, primary.el); // keep the layers-panel highlight bound to the new node
     reflow();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1187,6 +1191,20 @@ export function Inspector({
   );
   const historyRef = useRef(history);
   historyRef.current = history;
+
+  // Board/token/meta ops (LayersPanel, Tokens panel) write to the SAME undo stack
+  // but go through the design API, not the inspector. They broadcast the resulting
+  // history depths so the toolbar's Undo/Redo affordance stays in sync (otherwise
+  // the button reads disabled even though Cmd+Z would work).
+  useEffect(() => {
+    const on = (e: Event) => {
+      const d = (e as CustomEvent<{ undo?: number; redo?: number }>).detail;
+      if (typeof d?.undo === 'number') setCanUndo(d.undo > 0);
+      if (typeof d?.redo === 'number') setCanRedo(d.redo > 0);
+    };
+    window.addEventListener('opencanva:history', on);
+    return () => window.removeEventListener('opencanva:history', on);
+  }, []);
 
   if (!active) return null;
 
