@@ -22,18 +22,34 @@ export async function preview(): Promise<void> {
   server.printUrls();
 }
 
-/** Copy the bundled agent skills into the workspace's .claude/skills/. */
-export async function sync(): Promise<void> {
+/** The agent skill directories `sync`/`init` populate. `.agents/skills/` is the
+ *  vendor-neutral location read by Codex, Cursor, and others (committed); the
+ *  Claude-specific `.claude/skills/` is git-ignored and regenerated locally. */
+export const SKILL_DIRS = ['.agents/skills', '.claude/skills'] as const;
+
+/** Copy the bundled agent skills into `root`'s `.agents/skills/` and
+ *  `.claude/skills/`. Returns the skill names copied. */
+export function copyBundledSkills(root: string): string[] {
   const skillsSrc = fileURLToPath(new URL('../../skills', import.meta.url));
-  if (!existsSync(skillsSrc)) {
-    console.error('No skills bundled with @opencanva/core.');
-    return;
-  }
-  const dest = path.join(process.cwd(), '.claude', 'skills');
-  mkdirSync(dest, { recursive: true });
+  if (!existsSync(skillsSrc)) throw new Error('No skills bundled with @opencanva/core.');
   const names = readdirSync(skillsSrc).filter((n) => !n.startsWith('.'));
-  for (const name of names) {
-    cpSync(path.join(skillsSrc, name), path.join(dest, name), { recursive: true });
+  for (const rel of SKILL_DIRS) {
+    const dest = path.join(root, ...rel.split('/'));
+    mkdirSync(dest, { recursive: true });
+    for (const name of names) {
+      cpSync(path.join(skillsSrc, name), path.join(dest, name), { recursive: true });
+    }
   }
-  console.log(`Synced ${names.length} skills → .claude/skills/ (${names.join(', ')})`);
+  return names;
+}
+
+/** Copy the bundled agent skills into the workspace's skill dirs (both agent
+ *  conventions), so the authoring knowledge is available to every agent. */
+export async function sync(): Promise<void> {
+  try {
+    const names = copyBundledSkills(process.cwd());
+    console.log(`Synced ${names.length} skills → ${SKILL_DIRS.join(' + ')}/ (${names.join(', ')})`);
+  } catch (err) {
+    console.error(String((err as Error)?.message ?? err));
+  }
 }

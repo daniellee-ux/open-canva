@@ -1,9 +1,14 @@
 node_modules/
 dist/
 .opencanva/
-.claude/
 *.log
 .DS_Store
+
+# Agent skill dirs: `.agents/skills/` is the vendor-neutral copy (read by Codex,
+# Cursor, …) and IS committed — it ships so a cloner gets the skills without
+# running `opencanva sync`. `.claude/skills/` is the Claude-specific copy; it's
+# regenerated locally by `opencanva sync`, so keep it out of git.
+.claude/
 
 # Design workspace is local-only in the open-source repo — only the starter guide
 # ships. Add your own designs under apps/demo/designs/; they stay on your machine.
