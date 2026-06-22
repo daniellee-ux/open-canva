@@ -76,6 +76,9 @@ export function TokensPanel({ designId, design, onClose }: { designId: string; d
             type="button"
             className="ox-btn"
             onClick={async () => {
+              // Cancel any queued debounced commit so a stale draft can't write
+              // the override straight back after the reset lands.
+              if (timer.current) clearTimeout(timer.current);
               try {
                 await resetTokens(designId);
                 toast.ok('Tokens reset');
