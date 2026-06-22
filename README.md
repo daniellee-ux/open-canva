@@ -50,7 +50,7 @@ export default [Poster] satisfies Scene[];
 - **Click-to-source.** Every object you click resolves to the exact `<Box>`/`<Text>` in your source (via injected `data-ox-loc` read off the React fiber — works across files and components). Drag/resize/recolor rewrite the object's props **in place** through a dev-only write-back API; the source stays byte-stable so HMR is surgical.
 - **Comments → edits.** Leave a `@canva-comment` on any object; the bundled `apply-comments` skill applies them.
 - **Current-design pointer.** The dev server writes `.opencanva/current.json` so an agent can resolve "this design / the object I selected".
-- **Works with any agent.** A root `AGENTS.md` (the cross-tool standard read by Codex, Cursor, Copilot, …) carries the repo guide, and `CLAUDE.md` symlinks to it. The authoring skills — `canva-authoring`, `create-design`, `apply-comments`, `current-design`, `create-theme` — ship as Agent Skills: `npm run sync` copies them into both `.agents/skills/` (vendor-neutral, committed) and `.claude/skills/` (local). `opencanva init` scaffolds a new project with all of it baked in.
+- **Works with any agent.** A root `AGENTS.md` (the cross-tool standard read by Codex, Cursor, Copilot, …) carries the repo guide, and `CLAUDE.md` is a byte-identical copy of it (kept in sync by CI). The authoring skills — `canva-authoring`, `create-design`, `apply-comments`, `current-design`, `create-theme` — ship as Agent Skills: `npm run sync` copies them into both `.agents/skills/` (vendor-neutral, committed) and `.claude/skills/` (local). `opencanva init` scaffolds a new project with all of it baked in.
 
 ## Layout
 

@@ -70,6 +70,18 @@ expectEqual(
   'template start-here == demo start-here',
 );
 
+// Root CLAUDE.md is a committed byte-identical copy of AGENTS.md (a copy, not a
+// symlink, so it survives no-symlink / Windows checkouts).
+{
+  const claude = path.join(ROOT, 'CLAUDE.md');
+  const agents = path.join(ROOT, 'AGENTS.md');
+  if (existsSync(claude) && existsSync(agents) && readFileSync(claude).equals(readFileSync(agents))) {
+    ok('CLAUDE.md == AGENTS.md');
+  } else {
+    fail('CLAUDE.md is out of sync with AGENTS.md — run `cp AGENTS.md CLAUDE.md`');
+  }
+}
+
 const lockPath = path.join(ROOT, 'skills-lock.json');
 if (existsSync(lockPath)) {
   const lock = JSON.parse(readFileSync(lockPath, 'utf8'));

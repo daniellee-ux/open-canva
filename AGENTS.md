@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Shared guidance for **any** coding agent (Claude Code, OpenAI Codex, Cursor, Copilot, …) working in this repository. `CLAUDE.md` is a symlink to this file, so every tool's conventional entry point resolves here. (On a Windows checkout without symlink support, `CLAUDE.md` may appear as plain text — read `AGENTS.md` directly.)
+Shared guidance for **any** coding agent (Claude Code, OpenAI Codex, Cursor, Copilot, …) working in this repository. `CLAUDE.md` is a byte-identical copy of this file (kept in lockstep by the `check:sync` CI step), so every tool's conventional entry point resolves to the same guidance on every platform. **`AGENTS.md` is the source** — after editing it, run `cp AGENTS.md CLAUDE.md`.
 
 OpenCanva is an agent-native graphic design framework: designs are React components under `designs/<id>/`, rendered on a zoomable canvas, editable via click-to-source, exported to PNG/SVG/PDF. npm-workspaces monorepo — `packages/core` (`@opencanva/core`: runtime + Vite plugin + CLI + bundled skills) and `apps/demo` (`@opencanva/demo`: the demo workspace — ships only the `start-here` starter guide; any other designs you add under `designs/` are git-ignored and stay local, see `.gitignore`). No build step — the CLI runs TypeScript directly via `tsx`.
 
