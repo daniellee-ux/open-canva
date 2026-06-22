@@ -10,12 +10,12 @@ This is an **OpenCanva** workspace: each design is a React component under `desi
 npm install
 npm run dev      # → http://localhost:5173 ; open a design at /d/<id>
 npm run build    # production build
-npm run sync     # re-copy the bundled agent skills into .agents/skills + .claude/skills
+npm run sync     # re-copy the bundled agent skills (run this after upgrading @opencanva/core)
 ```
 
 ## Authoring designs — read the skills first
 
-The authoring know-how ships as **Agent Skills** under `.agents/skills/` (and `.claude/skills/`). Before writing or editing anything under `designs/`, read **`.agents/skills/canva-authoring/SKILL.md`** — it's the source of truth for the file contract, the object primitives, the coordinate system, the design tokens, and the inspector-compatibility rules. Use **`create-design`** to make a new graphic, **`apply-comments`** to process inspector markers, **`current-design`** to resolve "this design".
+The authoring know-how ships as **Agent Skills** under `.agents/skills/` (and `.claude/skills/`). Before writing or editing anything under `designs/`, read **`.agents/skills/canva-authoring/SKILL.md`** — it's the source of truth for the file contract, the object primitives, the coordinate system, the design tokens, and the inspector-compatibility rules. Use **`create-design`** to make a new graphic, **`create-theme`** for a new palette, **`apply-comments`** to process inspector markers, **`current-design`** to resolve "this design".
 
 ## Hard rules (these break the editor silently if violated)
 
