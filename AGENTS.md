@@ -24,7 +24,9 @@ npm run typecheck    # tsc --noEmit on @opencanva/core
 
 ## Skills (how agents get the authoring knowledge)
 
-The authoring know-how ships as **Agent Skills** — `SKILL.md` files with YAML frontmatter, the format Claude Code and the cross-agent `.agents/skills/` convention both read. They live canonically in `packages/core/skills/` and are mirrored into the workspace's `.agents/skills/` (committed) and `.claude/skills/` (local) by `opencanva sync`.
+The authoring know-how ships as **Agent Skills** — `SKILL.md` files with YAML frontmatter, the format Claude Code and the cross-agent `.agents/skills/` convention both read. They live canonically in `packages/core/skills/`. `opencanva sync` mirrors them into the **demo workspace** at `apps/demo/.agents/skills/` (committed) and `apps/demo/.claude/skills/` (local); the `check:sync` CI step fails if the committed copy drifts from the canonical one.
+
+(The repo-root `.agents/skills/` holds only `frontend-design` — a third-party design-quality skill vendored for work *on the framework*, tracked in `skills-lock.json`. It is intentionally not part of the bundle `sync`/`init` distribute.)
 
 - **Authoring graphics** (the common task): write/edit files under `designs/<id>/`. Read the **`canva-authoring`** skill first — it's the source of truth for the file contract, the object primitives, the coordinate system, and the inspector-compatibility rules. Use **`create-design`** for the new-graphic workflow, **`apply-comments`** to process inspector markers, **`current-design`** to resolve "this design".
 - If your agent does not auto-discover skills, read `apps/demo/.agents/skills/canva-authoring/SKILL.md` directly before editing any design.
