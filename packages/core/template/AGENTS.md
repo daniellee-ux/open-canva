@@ -10,7 +10,8 @@ This is an **OpenCanva** workspace: each design is a React component under `desi
 npm install
 npm run dev      # → http://localhost:5173 ; open a design at /d/<id>
 npm run build    # production build
-npm run sync     # re-copy the bundled agent skills (run this after upgrading @opencanva/core)
+npm run sync     # re-copy the bundled agent skills — run after a fresh clone (to populate
+                 # .claude/skills for Claude Code) or after upgrading @opencanva/core
 ```
 
 ## Authoring designs — read the skills first

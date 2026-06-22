@@ -49,12 +49,14 @@ export function copyBundledSkills(root: string): string[] {
   return names;
 }
 
-/** True if `cwd` is anywhere inside THIS framework's monorepo (some ancestor
- *  package.json is named "opencanva"). */
+/** True if `cwd` is anywhere inside THIS framework's monorepo — an ancestor whose
+ *  package.json is named "opencanva" AND that holds the `packages/core/skills`
+ *  source (so a user project that merely happens to be named "opencanva" can't
+ *  match). */
 function insideFrameworkRepo(cwd: string): boolean {
   for (let d = cwd; ; ) {
     const pkg = path.join(d, 'package.json');
-    if (existsSync(pkg)) {
+    if (existsSync(pkg) && existsSync(path.join(d, 'packages', 'core', 'skills'))) {
       try {
         if ((JSON.parse(readFileSync(pkg, 'utf8')) as { name?: string }).name === 'opencanva') return true;
       } catch {
@@ -81,7 +83,7 @@ export async function sync(): Promise<void> {
   }
   try {
     const names = copyBundledSkills(process.cwd());
-    console.log(`Synced ${names.length} bundled skills → ${SKILL_DIRS.join(' + ')}/ (${names.join(', ')})`);
+    console.log(`Synced ${names.length} bundled skills → ${SKILL_DIRS.map((d) => `${d}/`).join(' + ')} (${names.join(', ')})`);
     console.log('(bundled skills are replaced in full; your own skills in these dirs are left untouched)');
   } catch (err) {
     console.error(String((err as Error)?.message ?? err));
