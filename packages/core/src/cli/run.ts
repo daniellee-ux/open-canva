@@ -49,12 +49,12 @@ export function copyBundledSkills(root: string): string[] {
   return names;
 }
 
-/** True if `cwd` is anywhere inside THIS framework's monorepo — an ancestor whose
+/** True if `dir` is anywhere inside THIS framework's monorepo — an ancestor whose
  *  package.json is named "opencanva" AND that holds the `packages/core/skills`
  *  source (so a user project that merely happens to be named "opencanva" can't
- *  match). */
-function insideFrameworkRepo(cwd: string): boolean {
-  for (let d = cwd; ; ) {
+ *  match). Used to keep both `sync` and `init` from polluting the framework checkout. */
+export function insideFrameworkRepo(dir: string): boolean {
+  for (let d = dir; ; ) {
     const pkg = path.join(d, 'package.json');
     if (existsSync(pkg) && existsSync(path.join(d, 'packages', 'core', 'skills'))) {
       try {

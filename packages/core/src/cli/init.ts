@@ -1,7 +1,7 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { copyBundledSkills } from './run';
+import { copyBundledSkills, insideFrameworkRepo } from './run';
 
 /** Pre-existing entries that don't make a target "non-empty" for scaffolding — a
  *  fresh `git init` / `gh repo create` directory (license, readme, editor config)
@@ -39,6 +39,12 @@ export async function init(targetArg?: string): Promise<void> {
   const target = path.resolve(process.cwd(), targetArg ?? '.');
   if (existsSync(target) && !statSync(target).isDirectory()) {
     console.error(`Target is not a directory: ${target}`);
+    process.exit(1);
+  }
+  // Symmetric with `sync`'s guard: don't scaffold a stray project inside the
+  // framework monorepo. Scaffold into a directory outside this repo instead.
+  if (insideFrameworkRepo(target)) {
+    console.error(`Refusing to scaffold inside the OpenCanva framework repo: ${target}\nRun \`opencanva init <dir>\` in a directory outside this monorepo.`);
     process.exit(1);
   }
   // Refuse to scaffold over real content (any entry except a fresh-repo allowlist —
