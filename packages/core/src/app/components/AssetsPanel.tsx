@@ -1,60 +1,199 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { type AssetFile, deleteAsset, listAssets, renameAsset, uploadAsset } from '../lib/assets';
+import { toast } from './ui/toast';
 import { Icon } from './icons';
 
 /**
- * Assets panel — lists files under `designs/<id>/assets/` (logos, photos,
- * textures) so the author/agent can see what a design has to work with. Read-only:
- * shows the path to drop into an `<ImageObject src="…" />`.
+ * Assets panel — browse + manage `designs/<id>/assets/`. Drag-drop or pick files
+ * to upload, rename or delete in place, and copy the `./assets/…` import path.
  */
-interface AssetFile {
-  name: string;
-  ext: string;
-  size: number;
-  isImage: boolean;
-  url: string;
-}
-
 export function AssetsPanel({ designId, onClose }: { designId: string; onClose: () => void }) {
-  const [data, setData] = useState<{ dir: string; files: AssetFile[] } | null>(null);
+  const [files, setFiles] = useState<AssetFile[] | null>(null);
+  const [dir, setDir] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [renaming, setRenaming] = useState<{ name: string; value: string } | null>(null);
+  const [confirmDel, setConfirmDel] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  // Depth counter: dragenter/dragleave fire for every child, so a single boolean
+  // guarded by currentTarget===target leaves the overlay stuck when the pointer
+  // exits over a child. Counting balanced enter/leave pairs is robust.
+  const dragDepth = useRef(0);
 
-  useEffect(() => {
-    fetch(`/__ox/assets?design=${encodeURIComponent(designId)}`)
-      .then((r) => r.json())
-      .then((d) => (d.error ? setError(d.error) : setData(d)))
-      .catch((e) => setError(String(e)));
+  const reload = useCallback(() => {
+    listAssets(designId)
+      .then((d) => {
+        setDir(d.dir);
+        setFiles(d.files);
+        setError(null);
+      })
+      .catch((e) => setError(String(e?.message ?? e)));
   }, [designId]);
 
+  useEffect(() => {
+    reload();
+    const hot = import.meta.hot;
+    const on = (d: { design?: string }) => {
+      if (!d || d.design === designId) reload();
+    };
+    hot?.on('opencanva:assets-changed', on);
+    return () => hot?.off('opencanva:assets-changed', on);
+  }, [designId, reload]);
+
+  const doUpload = useCallback(
+    async (list: FileList | File[]) => {
+      const arr = [...list].filter((f) => /^image\//.test(f.type) || /\.(png|jpe?g|gif|svg|webp|avif)$/i.test(f.name));
+      if (!arr.length) {
+        toast.err('Only image files can be uploaded');
+        return;
+      }
+      setUploading(true);
+      try {
+        for (const f of arr) await uploadAsset(designId, f);
+        toast.ok(arr.length > 1 ? `Uploaded ${arr.length} files` : `Uploaded ${arr[0].name}`);
+        reload();
+      } catch (err) {
+        toast.err(`Upload failed: ${String((err as Error)?.message ?? err)}`);
+      } finally {
+        setUploading(false);
+      }
+    },
+    [designId, reload],
+  );
+
+  const submitRename = useCallback(async () => {
+    if (!renaming) return;
+    const { name, value } = renaming;
+    setRenaming(null);
+    if (!value.trim() || value === name) return;
+    try {
+      await renameAsset(designId, name, value.trim());
+      toast.ok('Renamed');
+      reload();
+    } catch (err) {
+      toast.err(`Rename failed: ${String((err as Error)?.message ?? err)}`);
+    }
+  }, [renaming, designId, reload]);
+
+  const doDelete = useCallback(
+    async (name: string) => {
+      setConfirmDel(null);
+      try {
+        await deleteAsset(designId, name);
+        toast.ok(`Deleted ${name}`);
+        reload();
+      } catch (err) {
+        toast.err(`Delete failed: ${String((err as Error)?.message ?? err)}`);
+      }
+    },
+    [designId, reload],
+  );
+
   return (
-    <div className="ox-assets">
+    <div
+      className={`ox-assets${dragging ? ' is-dragging' : ''}`}
+      onDragEnter={(e) => {
+        e.preventDefault();
+        dragDepth.current += 1;
+        setDragging(true);
+      }}
+      onDragOver={(e) => {
+        e.preventDefault();
+      }}
+      onDragLeave={() => {
+        dragDepth.current = Math.max(0, dragDepth.current - 1);
+        if (dragDepth.current === 0) setDragging(false);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        dragDepth.current = 0;
+        setDragging(false);
+        if (e.dataTransfer.files.length) void doUpload(e.dataTransfer.files);
+      }}
+    >
       <div className="ox-assets-head">
-        <span>Assets</span>
-        <button type="button" className="ox-icon-btn" onClick={onClose} aria-label="Close">
-          <Icon name="close" />
-        </button>
+        <span>Assets{files ? ` · ${files.length}` : ''}</span>
+        <div className="ox-assets-head-actions">
+          <button type="button" className="ox-btn ox-btn--primary" disabled={uploading} onClick={() => inputRef.current?.click()}>
+            {uploading ? 'Uploading…' : 'Upload'}
+          </button>
+          <button type="button" className="ox-icon-btn" onClick={onClose} aria-label="Close">
+            <Icon name="close" />
+          </button>
+        </div>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          hidden
+          onChange={(e) => {
+            if (e.target.files?.length) void doUpload(e.target.files);
+            e.target.value = '';
+          }}
+        />
       </div>
+
       {error ? <div className="ox-assets-empty">{error}</div> : null}
-      {data ? (
+
+      {files ? (
         <>
           <div className="ox-assets-dir">
-            <code>{data.dir}/</code>
+            <code>{dir}/</code>
           </div>
-          {data.files.length === 0 ? (
+          {files.length === 0 ? (
             <div className="ox-assets-empty">
-              No assets. Drop images in <code>{data.dir}/</code> and reference them with{' '}
+              No assets yet. <strong>Drop images here</strong> or use Upload, then reference them with{' '}
               <code>&lt;ImageObject src="./assets/photo.jpg" /&gt;</code>.
             </div>
           ) : (
             <ul className="ox-assets-list">
-              {data.files.map((f) => (
+              {files.map((f) => (
                 <li key={f.name}>
                   {f.isImage ? (
                     <img src={f.url} alt={f.name} className="ox-asset-thumb" />
                   ) : (
                     <span className="ox-asset-thumb ox-asset-thumb--file">.{f.ext}</span>
                   )}
-                  <span className="ox-asset-name">{f.name}</span>
-                  <span className="ox-asset-size">{(f.size / 1024).toFixed(0)} KB</span>
+                  {renaming?.name === f.name ? (
+                    <input
+                      className="ox-asset-rename"
+                      // biome-ignore lint/a11y/noAutofocus: inline rename field
+                      autoFocus
+                      value={renaming.value}
+                      onChange={(e) => setRenaming({ name: f.name, value: e.target.value })}
+                      onBlur={submitRename}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') submitRename();
+                        else if (e.key === 'Escape') setRenaming(null);
+                      }}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      className="ox-asset-name"
+                      title="Copy import path"
+                      onClick={() => {
+                        void navigator.clipboard?.writeText(`./assets/${f.name}`);
+                        toast.ok(`Copied ./assets/${f.name}`);
+                      }}
+                    >
+                      {f.name}
+                    </button>
+                  )}
+                  {f.uses === 0 ? <span className="ox-asset-badge" title="Not referenced by this design">unused</span> : null}
+                  {confirmDel === f.name ? (
+                    <span className="ox-asset-confirm">
+                      <button type="button" className="ox-asset-act ox-asset-act--danger" onClick={() => doDelete(f.name)}>Delete?</button>
+                      <button type="button" className="ox-asset-act" onClick={() => setConfirmDel(null)}>No</button>
+                    </span>
+                  ) : (
+                    <span className="ox-asset-row-actions">
+                      <button type="button" className="ox-asset-act" title="Rename" onClick={() => setRenaming({ name: f.name, value: f.name })}><Icon name="text" size={13} /></button>
+                      <button type="button" className="ox-asset-act ox-asset-act--danger" title="Delete" onClick={() => setConfirmDel(f.name)}><Icon name="close" size={13} /></button>
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>
@@ -63,6 +202,8 @@ export function AssetsPanel({ designId, onClose }: { designId: string; onClose: 
       ) : (
         !error && <div className="ox-assets-empty">Loading…</div>
       )}
+
+      {dragging ? <div className="ox-assets-drop">Drop to upload</div> : null}
     </div>
   );
 }

@@ -197,7 +197,10 @@ export function findLayoutIssues(root: ParentNode = document): LayoutIssue[] {
   const canvas = root.querySelector<HTMLElement>('.ox-canvas');
   const zoom = Number(canvas?.getAttribute('data-ox-zoom')) || 1;
 
-  root.querySelectorAll<HTMLElement>('.ox-board').forEach((board) => {
+  // Scope to the live canvas: LayersPanel thumbnails render real `.ox-board` nodes
+  // too (inside a `scale()` wrapper), which would both duplicate every issue across
+  // N thumbnails and divide their rects by the wrong zoom. Lint only the real boards.
+  (canvas ?? root).querySelectorAll<HTMLElement>('.ox-board').forEach((board) => {
     const objs = [...board.querySelectorAll<HTMLElement>('[data-ox-obj]')];
     const br = board.getBoundingClientRect();
     const vboxes = objs.filter(isVisibleBox);

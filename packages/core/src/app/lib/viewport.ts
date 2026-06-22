@@ -18,6 +18,8 @@ export interface Viewport {
   transform: string;
   zoomBy: (factor: number) => void;
   zoomTo: (z: number) => void;
+  /** Pan by a screen-pixel delta (used by the inspector's edit-mode pan gesture). */
+  panBy: (dx: number, dy: number) => void;
   fit: () => void;
   actualSize: () => void;
 }
@@ -94,13 +96,25 @@ export function useViewport(
     [stageRef, applyZoom],
   );
 
+  const panBy = useCallback((dx: number, dy: number) => {
+    const p = panRef.current;
+    setPan({ x: p.x + dx, y: p.y + dy });
+  }, []);
+
   // Fit once on mount (after layout), and whenever the content size changes.
   useEffect(() => {
     const id = requestAnimationFrame(fit);
     return () => cancelAnimationFrame(id);
   }, [fit, content.w, content.h]);
 
-  // Imperative wheel + pointer handlers, bound once (passive:false for zoom).
+  // Imperative wheel + pointer handlers (passive:false for zoom). The host renders
+  // a "Loading…" placeholder before <Stage> mounts, so on the first run stageRef is
+  // still null and we bail; re-run once the design is READY (a boolean that flips
+  // false→true when content first gets real dimensions) so the listeners attach.
+  // We depend on the boolean, NOT the raw dimensions, so a later size change (board
+  // add/delete) can't tear down and re-attach listeners mid-pan-gesture — which
+  // would freeze the pan and strand the grabbing cursor.
+  const ready = content.w > 0 && content.h > 0;
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
@@ -120,32 +134,59 @@ export function useViewport(
       }
     };
 
+    const PAN_THRESHOLD = 3; // px the pointer must travel before a press becomes a pan
     let panning = false;
-    let spaceHeld = false;
+    let pending = false; // a left/middle press is down but hasn't moved far enough yet
+    let start = { x: 0, y: 0 };
     let last = { x: 0, y: 0 };
+    let pointerId = -1;
 
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space') spaceHeld = true;
-    };
-    const onKeyUp = (e: KeyboardEvent) => {
-      if (e.code === 'Space') spaceHeld = false;
-    };
-    const onPointerDown = (e: PointerEvent) => {
-      const wantsPan = e.button === 1 || (e.button === 0 && spaceHeld);
-      if (!wantsPan) return;
-      e.preventDefault();
+    const beginPan = (e: PointerEvent) => {
       panning = true;
-      last = { x: e.clientX, y: e.clientY };
-      stage.setPointerCapture(e.pointerId);
+      pending = false;
+      try {
+        stage.setPointerCapture(e.pointerId);
+      } catch {
+        /* capture is best-effort; panning still works without it */
+      }
       stage.classList.add('ox-stage--grabbing');
+      // Drop any text selection a sub-threshold drag may have started.
+      window.getSelection?.()?.removeAllRanges();
+    };
+
+    const onPointerDown = (e: PointerEvent) => {
+      // Pan on middle-drag or a plain left-drag of the canvas. In inspect mode the
+      // inspector stops propagation for object/marquee gestures before this
+      // stage-level handler runs, so a left-drag only pans the empty canvas (or
+      // anywhere in view mode). Crucially we DON'T preventDefault or grab here — a
+      // plain click must still select text / focus; we only commit to a pan once the
+      // pointer actually moves past the threshold (see onPointerMove).
+      if (e.button !== 0 && e.button !== 1) return;
+      pending = true;
+      pointerId = e.pointerId;
+      start = { x: e.clientX, y: e.clientY };
+      last = start;
+      // Middle-button press has no text-selection/focus to preserve, and native
+      // autoscroll / pan-ring (Windows/Linux) arms on THIS down event — suppress it
+      // now; the first move would be too late. Left stays deferred to the threshold.
+      if (e.button === 1) e.preventDefault();
     };
     const onPointerMove = (e: PointerEvent) => {
+      if (pending && !panning && e.pointerId === pointerId) {
+        // The pointer was released without a pointerup we saw (e.g. after a
+        // pointercancel) — abandon the pending press instead of ghost-panning.
+        if (e.buttons === 0) { pending = false; return; }
+        if (Math.abs(e.clientX - start.x) < PAN_THRESHOLD && Math.abs(e.clientY - start.y) < PAN_THRESHOLD) return;
+        beginPan(e);
+      }
       if (!panning) return;
+      e.preventDefault();
       const p = panRef.current;
       setPan({ x: p.x + (e.clientX - last.x), y: p.y + (e.clientY - last.y) });
       last = { x: e.clientX, y: e.clientY };
     };
     const onPointerUp = (e: PointerEvent) => {
+      pending = false;
       if (!panning) return;
       panning = false;
       try {
@@ -160,17 +201,19 @@ export function useViewport(
     stage.addEventListener('pointerdown', onPointerDown);
     stage.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
+    // A cancelled/lost pointer never fires pointerup — route both through the same
+    // reset so a half-started gesture can't strand pending/panning state.
+    stage.addEventListener('pointercancel', onPointerUp);
+    stage.addEventListener('lostpointercapture', onPointerUp);
     return () => {
       stage.removeEventListener('wheel', onWheel);
       stage.removeEventListener('pointerdown', onPointerDown);
       stage.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
+      stage.removeEventListener('pointercancel', onPointerUp);
+      stage.removeEventListener('lostpointercapture', onPointerUp);
     };
-  }, [stageRef, applyZoom]);
+  }, [stageRef, applyZoom, ready]);
 
   return {
     zoom,
@@ -178,6 +221,7 @@ export function useViewport(
     transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
     zoomBy,
     zoomTo,
+    panBy,
     fit,
     actualSize,
   };

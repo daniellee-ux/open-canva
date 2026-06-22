@@ -6,9 +6,12 @@ import { type InlineConfig, loadConfigFromFile, searchForWorkspaceRoot } from 'v
 import type { OpencanvaConfig } from '../config';
 import { assetsPlugin } from './assets-plugin';
 import { currentPlugin } from './current-plugin';
+import { designApiPlugin } from './design-api';
+import { foldersPlugin } from './folders-plugin';
 import { inspectorApiPlugin } from './inspector-api';
 import { locTagsPlugin } from './loc-tags-plugin';
 import { opencanvaPlugin } from './opencanva-plugin';
+import { createUndoStack } from './undo-stack';
 
 const VERSION = '0.0.0';
 
@@ -41,6 +44,10 @@ export async function createViteConfig(opts: CreateViteConfigOptions): Promise<I
   const designsDir = config.designsDir ?? 'designs';
   const designsRoot = path.resolve(userCwd, designsDir);
   const workspaceRoot = searchForWorkspaceRoot(userCwd);
+  // One source-edit history shared by every write endpoint, so inspector edits,
+  // board ops and token edits land on a single Cmd+Z timeline (not separate
+  // stacks that silently clobber each other).
+  const undoStack = createUndoStack();
 
   return {
     root,
@@ -51,9 +58,11 @@ export async function createViteConfig(opts: CreateViteConfigOptions): Promise<I
       locTagsPlugin({ designsRoot }),
       react(),
       opencanvaPlugin({ userCwd, config, version: VERSION }),
-      inspectorApiPlugin({ userCwd, designsRoot }),
+      inspectorApiPlugin({ userCwd, designsRoot, undoStack }),
       currentPlugin({ userCwd }),
       assetsPlugin({ designsRoot }),
+      designApiPlugin({ designsRoot, undoStack }),
+      foldersPlugin({ designsRoot }),
     ],
     resolve: {
       dedupe: ['react', 'react-dom'],

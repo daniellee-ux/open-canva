@@ -28,6 +28,8 @@ export interface ObjectProps {
   z?: number;
   /** 0–1 opacity. */
   opacity?: number;
+  /** Human label shown in the layers panel (esp. useful on a `<Group>`). Not rendered. */
+  name?: string;
   className?: string;
   style?: CSSProperties;
 }
@@ -59,6 +61,7 @@ function objData(p: ObjectProps, type: string): AnyData {
     'data-ox-w': p.w,
     'data-ox-h': p.h,
     'data-ox-rotate': p.rotate,
+    'data-ox-name': p.name,
   };
 }
 
@@ -274,6 +277,10 @@ export interface ImageObjectProps extends ObjectProps {
   alt?: string;
   /** How the image fills its box. */
   fit?: 'cover' | 'contain' | 'fill';
+  /** Focal point for a `cover` crop, as CSS object-position (e.g. `50% 30%`). */
+  focus?: string;
+  /** Extra zoom applied on top of the fit (1 = none); reframes a `cover` crop. */
+  zoom?: number;
   radius?: number | string;
 }
 
@@ -282,6 +289,8 @@ export function ImageObject({
   src,
   alt = '',
   fit = 'cover',
+  focus,
+  zoom,
   radius,
   className,
   ...p
@@ -296,7 +305,17 @@ export function ImageObject({
         src={src}
         alt={alt}
         draggable={false}
-        style={{ width: '100%', height: '100%', objectFit: fit, display: 'block' }}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: fit,
+          objectPosition: focus,
+          // Zoom from the center (clipped by the container's overflow:hidden) rather
+          // than enlarging the element from its top-left, which drifted the crop.
+          transform: zoom && zoom !== 1 ? `scale(${zoom})` : undefined,
+          transformOrigin: 'center',
+          display: 'block',
+        }}
       />
     </div>
   );
