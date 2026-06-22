@@ -1022,6 +1022,20 @@ export function Inspector({
     },
     [fillProp, commitProps],
   );
+  // Cancel pending debounced edits (slider/zoom typeTimers, color picker) when
+  // leaving edit mode, switching designs, or unmounting — each captured its target
+  // src at call time, so a timer that fires after navigation would write an edit +
+  // undo entry to a design the user has already left.
+  useEffect(() => {
+    return () => {
+      for (const t of Object.values(typeTimers.current)) clearTimeout(t);
+      typeTimers.current = {};
+      if (colorTimer.current) {
+        clearTimeout(colorTimer.current);
+        colorTimer.current = null;
+      }
+    };
+  }, [active, designId]);
   const zOrder = useCallback(
     (dir: 'front' | 'back') => void commitProps({ z: dir === 'front' ? 999 : 0 }, 'Order').then(() => flash({ kind: 'ok', msg: dir === 'front' ? 'Brought to front' : 'Sent to back' })),
     [commitProps, flash],
