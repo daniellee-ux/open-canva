@@ -16,7 +16,7 @@ npm run preview       # serve the production build
 npm run typecheck    # tsc --noEmit on @opencanva/core
 ```
 
-- The demo app runs the CLI directly: `opencanva <dev|build|preview|sync|init>` (defaults to `dev`). `opencanva sync` writes into the **current** directory, so regenerate the committed skills with **`npm run sync`** (which runs it in `apps/demo`) — not bare `opencanva sync` from the repo root.
+- The demo app runs the CLI directly: `opencanva <dev|build|preview|sync|init>` (defaults to `dev`). Regenerate the committed skills with **`npm run sync`** (it runs in `apps/demo`); bare `opencanva sync` inside this monorepo is refused (it would write a stray skills tree).
 - `npm run sync` copies the skills bundled in `packages/core/skills/` into the demo workspace's **`.agents/skills/`** (vendor-neutral, committed) **and `.claude/skills/`** (Claude-specific, git-ignored): `canva-authoring`, `create-design`, `apply-comments`, `current-design`, `create-theme`.
 - `opencanva init [dir]` scaffolds a fresh OpenCanva project (config, starter design, and both skill dirs) so a new project is multi-agent ready out of the box.
 - To typecheck the designs specifically: `npx tsc --noEmit -p apps/demo` (this is what CI runs alongside the core typecheck).
