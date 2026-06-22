@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Shared guidance for **any** coding agent (Claude Code, OpenAI Codex, Cursor, Copilot, …) working in this repository. `CLAUDE.md` is a symlink to this file, so every tool's conventional entry point resolves here.
+Shared guidance for **any** coding agent (Claude Code, OpenAI Codex, Cursor, Copilot, …) working in this repository. `CLAUDE.md` is a symlink to this file, so every tool's conventional entry point resolves here. (On a Windows checkout without symlink support, `CLAUDE.md` may appear as plain text — read `AGENTS.md` directly.)
 
 OpenCanva is an agent-native graphic design framework: designs are React components under `designs/<id>/`, rendered on a zoomable canvas, editable via click-to-source, exported to PNG/SVG/PDF. npm-workspaces monorepo — `packages/core` (`@opencanva/core`: runtime + Vite plugin + CLI + bundled skills) and `apps/demo` (`@opencanva/demo`: the demo workspace — ships only the `start-here` starter guide; any other designs you add under `designs/` are git-ignored and stay local, see `.gitignore`). No build step — the CLI runs TypeScript directly via `tsx`.
 
@@ -16,15 +16,15 @@ npm run preview       # serve the production build
 npm run typecheck    # tsc --noEmit on @opencanva/core
 ```
 
-- The demo app runs the CLI directly: `opencanva <dev|build|preview|sync|init>` (defaults to `dev`).
-- `opencanva sync` copies the skills bundled in `packages/core/skills/` into the workspace's **`.agents/skills/`** (vendor-neutral, committed) **and `.claude/skills/`** (Claude-specific, git-ignored): `canva-authoring`, `create-design`, `apply-comments`, `current-design`, `create-theme`.
+- The demo app runs the CLI directly: `opencanva <dev|build|preview|sync|init>` (defaults to `dev`). `opencanva sync` writes into the **current** directory, so regenerate the committed skills with **`npm run sync`** (which runs it in `apps/demo`) — not bare `opencanva sync` from the repo root.
+- `npm run sync` copies the skills bundled in `packages/core/skills/` into the demo workspace's **`.agents/skills/`** (vendor-neutral, committed) **and `.claude/skills/`** (Claude-specific, git-ignored): `canva-authoring`, `create-design`, `apply-comments`, `current-design`, `create-theme`.
 - `opencanva init [dir]` scaffolds a fresh OpenCanva project (config, starter design, and both skill dirs) so a new project is multi-agent ready out of the box.
 - To typecheck the designs specifically: `npx tsc --noEmit -p apps/demo` (this is what CI runs alongside the core typecheck).
 - **There is no test runner.** "Verify by running" (below) is the test — drive the canvas in a browser; `tsc` passing does not mean it works.
 
 ## Skills (how agents get the authoring knowledge)
 
-The authoring know-how ships as **Agent Skills** — `SKILL.md` files with YAML frontmatter, the format Claude Code and the cross-agent `.agents/skills/` convention both read. They live canonically in `packages/core/skills/`. `opencanva sync` mirrors them into the **demo workspace** at `apps/demo/.agents/skills/` (committed) and `apps/demo/.claude/skills/` (local); the `check:sync` CI step fails if the committed copy drifts from the canonical one.
+The authoring know-how ships as **Agent Skills** — `SKILL.md` files with YAML frontmatter, the format Claude Code and the cross-agent `.agents/skills/` convention both read. They live canonically in `packages/core/skills/`. `npm run sync` mirrors them into the **demo workspace** at `apps/demo/.agents/skills/` (committed) and `apps/demo/.claude/skills/` (local); the `check:sync` CI step fails if the committed copy drifts from the canonical one.
 
 (The repo-root `.agents/skills/` holds only `frontend-design` — a third-party design-quality skill vendored for work *on the framework*, tracked in `skills-lock.json`. It is intentionally not part of the bundle `sync`/`init` distribute.)
 

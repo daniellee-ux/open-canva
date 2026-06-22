@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "opencanva dev",
     "build": "opencanva build",
-    "preview": "opencanva preview"
+    "preview": "opencanva preview",
+    "sync": "opencanva sync"
   },
   "dependencies": {
     "@opencanva/core": "*",

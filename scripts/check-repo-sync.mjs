@@ -3,7 +3,7 @@
 //   1. apps/demo/.agents/skills  must equal  packages/core/skills   (the source of truth)
 //   2. packages/core/template/designs/start-here  must equal  apps/demo/designs/start-here
 //   3. each skills-lock.json entry's computedHash must match the vendored .agents/skills/<name> tree
-// Run by CI; fix mismatches by re-running `opencanva sync`, re-copying the template
+// Run by CI; fix mismatches by re-running `npm run sync`, re-copying the template
 // starter, or recomputing the lock hash, then committing.
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
