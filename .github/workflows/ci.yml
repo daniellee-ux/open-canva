@@ -32,5 +32,8 @@ jobs:
       - name: Typecheck (demo)
         run: npx tsc --noEmit -p apps/demo
 
+      - name: Typecheck (init template)
+        run: npx tsc --noEmit -p packages/core/template/tsconfig.json
+
       - name: Check committed skills/template/lockfile are in sync
         run: npm run check:sync
