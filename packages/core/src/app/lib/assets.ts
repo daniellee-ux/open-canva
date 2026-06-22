@@ -17,16 +17,24 @@ export async function listAssets(design: string): Promise<{ dir: string; files: 
   return { dir: data.dir, files: data.files ?? [] };
 }
 
-/** Lowercase, dash-separate, and keep a sane image extension. */
-function sanitizeName(name: string): string {
+/** Lowercase, dash-separate, and keep a sane image extension. When the input has
+ *  no extension, fall back to `fallbackExt` (the source file's, for renames) so a
+ *  rename to a bare base name can't silently relabel a .jpg as .png. */
+function sanitizeName(name: string, fallbackExt = 'png'): string {
   const dot = name.lastIndexOf('.');
   const base =
     (dot > 0 ? name.slice(0, dot) : name)
       .toLowerCase()
       .replace(/[^a-z0-9._-]+/g, '-')
       .replace(/^-+|-+$/g, '') || 'asset';
-  const ext = (dot > 0 ? name.slice(dot + 1) : '').toLowerCase().replace(/[^a-z0-9]/g, '') || 'png';
+  const ext = (dot > 0 ? name.slice(dot + 1) : '').toLowerCase().replace(/[^a-z0-9]/g, '') || fallbackExt;
   return `${base}.${ext}`;
+}
+
+/** The extension of an existing filename (lowercased), or 'png' if it has none. */
+function extOf(name: string): string {
+  const dot = name.lastIndexOf('.');
+  return (dot > 0 ? name.slice(dot + 1) : '').toLowerCase().replace(/[^a-z0-9]/g, '') || 'png';
 }
 
 function bump(name: string): string {
@@ -60,7 +68,8 @@ export async function renameAsset(design: string, from: string, to: string): Pro
   const res = await fetch(`/__ox/assets/${encodeURIComponent(design)}/${encodeURIComponent(from)}`, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json', 'x-opencanva-write': '1' },
-    body: JSON.stringify({ to: sanitizeName(to) }),
+    // Keep the source file's extension when the user typed only a base name.
+    body: JSON.stringify({ to: sanitizeName(to, extOf(from)) }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);

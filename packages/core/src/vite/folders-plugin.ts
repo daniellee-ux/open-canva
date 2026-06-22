@@ -23,6 +23,7 @@ interface Manifest {
 }
 
 const MAX = 100_000;
+const DESIGN_RE = /^[A-Za-z0-9][\w-]*$/;
 
 function sameOrigin(req: IncomingMessage): boolean {
   const origin = req.headers.origin;
@@ -72,7 +73,19 @@ export function foldersPlugin(opts: { designsRoot: string }): Plugin {
   const read = (): Manifest => {
     try {
       const m = JSON.parse(readFileSync(file, 'utf8'));
-      return { folders: Array.isArray(m.folders) ? m.folders : [], assignments: m.assignments ?? {} };
+      // Validate per-entry shape — a hand-edited .folders.json must not produce
+      // broken sidebar rows (key=undefined) or lost/garbage assignments.
+      const folders: Folder[] = (Array.isArray(m?.folders) ? m.folders : [])
+        .filter((f: unknown): f is Folder => !!f && typeof (f as Folder).id === 'string' && typeof (f as Folder).name === 'string')
+        .map((f: Folder) => ({ id: f.id, name: f.name, ...(typeof f.icon === 'string' ? { icon: f.icon } : {}) }));
+      const ids = new Set(folders.map((f) => f.id));
+      const rawA = m?.assignments && typeof m.assignments === 'object' && !Array.isArray(m.assignments) ? m.assignments : {};
+      const assignments: Record<string, string> = {};
+      for (const [design, folder] of Object.entries(rawA)) {
+        // Drop assignments that are malformed or point at a folder that no longer exists.
+        if (typeof folder === 'string' && DESIGN_RE.test(design) && ids.has(folder)) assignments[design] = folder;
+      }
+      return { folders, assignments };
     } catch {
       return { folders: [], assignments: {} };
     }
@@ -132,7 +145,7 @@ export function foldersPlugin(opts: { designsRoot: string }): Plugin {
             .then((body) => {
               const design = String(body?.design ?? '');
               const folder = body?.folder == null ? null : String(body.folder);
-              if (!/^[A-Za-z0-9][\w-]*$/.test(design)) return json(res, 400, { error: 'invalid design id' });
+              if (!DESIGN_RE.test(design)) return json(res, 400, { error: 'invalid design id' });
               const m = read();
               if (folder && !m.folders.some((f) => f.id === folder)) return json(res, 404, { error: 'folder not found' });
               if (folder) m.assignments[design] = folder;

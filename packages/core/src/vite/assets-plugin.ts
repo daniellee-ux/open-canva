@@ -23,6 +23,37 @@ function validName(name: string): boolean {
   return IMAGE_EXTS.has(path.extname(name).slice(1).toLowerCase());
 }
 
+/**
+ * Sniff the uploaded bytes against the claimed extension so arbitrary content
+ * can't be stored under an image name (the file is served verbatim via /@fs).
+ * Raster formats are checked by magic number; SVG must look like XML/SVG and
+ * carry no inline <script> (its only top-level XSS vector here).
+ */
+function contentMatchesExt(ext: string, b: Buffer): boolean {
+  const starts = (sig: number[]) => sig.length <= b.length && sig.every((v, i) => b[i] === v);
+  const ascii = (start: number, end: number) => b.subarray(start, end).toString('latin1');
+  switch (ext) {
+    case 'png':
+      return starts([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    case 'jpg':
+    case 'jpeg':
+      return starts([0xff, 0xd8, 0xff]);
+    case 'gif':
+      return ascii(0, 6) === 'GIF87a' || ascii(0, 6) === 'GIF89a';
+    case 'webp':
+      return ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP';
+    case 'avif':
+      return ascii(4, 8) === 'ftyp' && /avif|avis|mif1|miaf/.test(ascii(8, 24));
+    case 'svg': {
+      const head = b.subarray(0, 2048).toString('utf8').trimStart().toLowerCase();
+      if (!(head.startsWith('<?xml') || head.startsWith('<svg') || head.startsWith('<!doctype svg'))) return false;
+      return !/<script[\s/>]/i.test(b.toString('utf8'));
+    }
+    default:
+      return false;
+  }
+}
+
 function sameOrigin(req: IncomingMessage): boolean {
   const origin = req.headers.origin;
   if (origin) {
@@ -125,7 +156,9 @@ export function assetsPlugin(opts: { designsRoot: string }): Plugin {
           }
           const usesOf = (name: string) => {
             const esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            return (src.match(new RegExp(`assets/${esc}`, 'g')) ?? []).length;
+            // Anchor the end to a name terminator so `logo.png` doesn't count inside
+            // a longer sibling like `logo.png2.png` or `logo.png.bak`.
+            return (src.match(new RegExp(`assets/${esc}(?![\\w.-])`, 'g')) ?? []).length;
           };
           const files = existsSync(dir)
             ? readdirSync(dir)
@@ -152,11 +185,24 @@ export function assetsPlugin(opts: { designsRoot: string }): Plugin {
 
         if (method === 'POST') {
           const overwrite = url.searchParams.get('overwrite') === '1';
+          // Early reject (avoid reading a 25MB body for an obvious collision); the
+          // exclusive write flag below is what actually closes the check-then-write race.
           if (existsSync(loc.abs) && !overwrite) return json(res, 409, { error: 'exists', name: file });
           readRaw(req, MAX_UPLOAD)
             .then((buf) => {
+              const ext = path.extname(file).slice(1).toLowerCase();
+              if (!contentMatchesExt(ext, buf)) {
+                return json(res, 415, { error: `File content does not match a .${ext} image` });
+              }
               mkdirSync(loc.dir, { recursive: true });
-              writeFileSync(loc.abs, buf);
+              try {
+                // 'wx' fails if the path already exists → the collision check and the
+                // write are atomic, so two concurrent same-name uploads can't clobber.
+                writeFileSync(loc.abs, buf, overwrite ? undefined : { flag: 'wx' });
+              } catch (err) {
+                if ((err as NodeJS.ErrnoException)?.code === 'EEXIST') return json(res, 409, { error: 'exists', name: file });
+                throw err;
+              }
               changed(design);
               json(res, 200, { ok: true, asset: assetInfo(loc.dir, file) });
             })

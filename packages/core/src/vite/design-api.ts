@@ -168,7 +168,9 @@ export function designApiPlugin(opts: { designsRoot: string; undoStack: UndoStac
         if (!wouldParse(next)) return json(res, 422, { error: 'Edit would break the file; not written.' });
         // Through the shared undo stack so a board op joins the inspector's Cmd+Z timeline.
         undoStack.applyWrite(file, next);
-        json(res, 200, { ok: true, count: result.length });
+        // Return the new history depths so the client can sync the inspector's
+        // Undo/Redo affordance (a board op pushes onto the same timeline).
+        json(res, 200, { ok: true, count: result.length, ...undoStack.depths() });
       };
 
       server.middlewares.use('/__ox/design', (req, res, next) => {
@@ -197,7 +199,7 @@ export function designApiPlugin(opts: { designsRoot: string; undoStack: UndoStac
               const out = rewriteDesignExport(code, parseFile(code), literal);
               if (!wouldParse(out)) return json(res, 422, { error: 'Edit would break the file; not written.' });
               undoStack.applyWrite(file, out);
-              json(res, 200, { ok: true, reset: isReset });
+              json(res, 200, { ok: true, reset: isReset, ...undoStack.depths() });
             })
             .catch((err) => json(res, 500, { error: String(err?.message ?? err) }));
           return;
@@ -246,7 +248,7 @@ export function designApiPlugin(opts: { designsRoot: string; undoStack: UndoStac
               if (out == null) return json(res, 422, { error: 'No `export const meta` to rename. Add one first.' });
               if (!wouldParse(out)) return json(res, 422, { error: 'Edit would break the file; not written.' });
               undoStack.applyWrite(file, out);
-              json(res, 200, { ok: true, title });
+              json(res, 200, { ok: true, title, ...undoStack.depths() });
             })
             .catch((err) => json(res, 500, { error: String(err?.message ?? err) }));
           return;
@@ -266,7 +268,12 @@ export function designApiPlugin(opts: { designsRoot: string; undoStack: UndoStac
             .then((body) => {
               const order = Array.isArray(body?.order) ? (body.order as number[]) : null;
               editBoardArray(id, res, (texts) => {
-                if (!order || order.length !== texts.length || new Set(order).size !== texts.length || order.some((i) => i < 0 || i >= texts.length)) {
+                if (
+                  !order ||
+                  order.length !== texts.length ||
+                  new Set(order).size !== texts.length ||
+                  order.some((i) => !Number.isInteger(i) || i < 0 || i >= texts.length)
+                ) {
                   return { error: 'order must be a permutation of board indices' };
                 }
                 return order.map((i) => texts[i]);
