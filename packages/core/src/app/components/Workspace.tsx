@@ -106,7 +106,9 @@ function Sidebar({ selected }: { selected: WsRoute }) {
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
   const onDesigns = selected === 'designs';
-  const countFor = (id: string) => Object.values(manifest.assignments).filter((f) => f === id).length;
+  // Count over the live designIds (mirrors the grid filter at line ~465) so a
+  // stale assignment for a deleted design doesn't inflate the badge.
+  const countFor = (id: string) => designIds.filter((d) => manifest.assignments[d] === id).length;
 
   const submitCreate = async () => {
     const name = newName.trim();
