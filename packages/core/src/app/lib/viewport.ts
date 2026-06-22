@@ -166,9 +166,16 @@ export function useViewport(
       pointerId = e.pointerId;
       start = { x: e.clientX, y: e.clientY };
       last = start;
+      // Middle-button press has no text-selection/focus to preserve, and native
+      // autoscroll / pan-ring (Windows/Linux) arms on THIS down event — suppress it
+      // now; the first move would be too late. Left stays deferred to the threshold.
+      if (e.button === 1) e.preventDefault();
     };
     const onPointerMove = (e: PointerEvent) => {
       if (pending && !panning && e.pointerId === pointerId) {
+        // The pointer was released without a pointerup we saw (e.g. after a
+        // pointercancel) — abandon the pending press instead of ghost-panning.
+        if (e.buttons === 0) { pending = false; return; }
         if (Math.abs(e.clientX - start.x) < PAN_THRESHOLD && Math.abs(e.clientY - start.y) < PAN_THRESHOLD) return;
         beginPan(e);
       }
@@ -194,11 +201,17 @@ export function useViewport(
     stage.addEventListener('pointerdown', onPointerDown);
     stage.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
+    // A cancelled/lost pointer never fires pointerup — route both through the same
+    // reset so a half-started gesture can't strand pending/panning state.
+    stage.addEventListener('pointercancel', onPointerUp);
+    stage.addEventListener('lostpointercapture', onPointerUp);
     return () => {
       stage.removeEventListener('wheel', onWheel);
       stage.removeEventListener('pointerdown', onPointerDown);
       stage.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
+      stage.removeEventListener('pointercancel', onPointerUp);
+      stage.removeEventListener('lostpointercapture', onPointerUp);
     };
   }, [stageRef, applyZoom, ready]);
 
