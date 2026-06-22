@@ -31,6 +31,7 @@
     "dev": "npm run dev -w @opencanva/demo",
     "build": "npm run build -w @opencanva/demo",
     "preview": "npm run preview -w @opencanva/demo",
-    "typecheck": "npm run typecheck -w @opencanva/core"
+    "typecheck": "npm run typecheck -w @opencanva/core",
+    "check:sync": "node scripts/check-repo-sync.mjs"
   }
 }
