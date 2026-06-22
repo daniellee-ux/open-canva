@@ -1,7 +1,11 @@
-import { cpSync, existsSync, mkdirSync, readdirSync, renameSync, symlinkSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { copyBundledSkills } from './run';
+
+/** Pre-existing entries that don't make a target "non-empty" for scaffolding —
+ *  a fresh `git init` directory is a legitimate place to scaffold into. */
+const SCAFFOLD_OK_ENTRIES = new Set(['.git', '.gitignore', '.DS_Store']);
 
 /**
  * Scaffold a fresh OpenCanva project: config + starter design + both agent skill
@@ -16,7 +20,9 @@ export async function init(targetArg?: string): Promise<void> {
   }
 
   const target = path.resolve(process.cwd(), targetArg ?? '.');
-  if (existsSync(target) && readdirSync(target).some((n) => !n.startsWith('.'))) {
+  // Refuse to scaffold over real content (any entry except a fresh-repo allowlist —
+  // including dotfiles like .env, so we don't silently clobber a configured dir).
+  if (existsSync(target) && readdirSync(target).some((n) => !SCAFFOLD_OK_ENTRIES.has(n))) {
     console.error(`Target directory is not empty: ${target}\nPass an empty or new directory: opencanva init <dir>`);
     process.exit(1);
   }
@@ -30,11 +36,25 @@ export async function init(targetArg?: string): Promise<void> {
   const gi = path.join(target, 'gitignore');
   if (existsSync(gi)) renameSync(gi, path.join(target, '.gitignore'));
 
+  // Pin @opencanva/core to the version of the CLI doing the scaffold, so a new
+  // project gets a concrete, reproducible dependency rather than a floating tag.
+  const corePkg = JSON.parse(readFileSync(fileURLToPath(new URL('../../package.json', import.meta.url)), 'utf8')) as {
+    version: string;
+  };
+  const projPkgPath = path.join(target, 'package.json');
+  const projPkg = JSON.parse(readFileSync(projPkgPath, 'utf8')) as { dependencies?: Record<string, string> };
+  if (projPkg.dependencies?.['@opencanva/core']) {
+    projPkg.dependencies['@opencanva/core'] = `^${corePkg.version}`;
+    writeFileSync(projPkgPath, `${JSON.stringify(projPkg, null, 2)}\n`);
+  }
+
   // Install the bundled skills into both agent conventions.
   const names = copyBundledSkills(target);
 
   // CLAUDE.md → AGENTS.md so every agent's conventional entry point resolves to
-  // one source (fall back to a copy on filesystems without symlink support).
+  // one source. Remove any pre-existing CLAUDE.md first so re-runs are idempotent
+  // (fall back to a copy on filesystems without symlink support).
+  rmSync(path.join(target, 'CLAUDE.md'), { force: true });
   try {
     symlinkSync('AGENTS.md', path.join(target, 'CLAUDE.md'));
   } catch {

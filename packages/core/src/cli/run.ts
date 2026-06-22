@@ -51,5 +51,6 @@ export async function sync(): Promise<void> {
     console.log(`Synced ${names.length} skills → ${SKILL_DIRS.join(' + ')}/ (${names.join(', ')})`);
   } catch (err) {
     console.error(String((err as Error)?.message ?? err));
+    process.exitCode = 1; // a real copy failure must be observable to callers / CI
   }
 }
