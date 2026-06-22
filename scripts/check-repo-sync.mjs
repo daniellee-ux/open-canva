@@ -73,7 +73,11 @@ if (existsSync(lockPath)) {
       continue;
     }
     const h = createHash('sha256');
-    for (const f of listFiles(dir)) h.update(readFileSync(path.join(dir, f)));
+    for (const f of listFiles(dir)) {
+      h.update(f); // fold the path in too, so a rename/shuffle is detected
+      h.update('\0');
+      h.update(readFileSync(path.join(dir, f)));
+    }
     const got = h.digest('hex');
     if (got !== entry.computedHash) {
       fail(`skills-lock: hash mismatch for ${name}\n    lock: ${entry.computedHash}\n    tree: ${got}`);
