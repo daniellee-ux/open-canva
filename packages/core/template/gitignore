@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.opencanva/
+.DS_Store
+*.log
+
+# .agents/skills is the committed, vendor-neutral copy of the skills (read by
+# Codex, Cursor, …). .claude/skills is the Claude-specific copy — regenerate it
+# locally with `npm run sync`.
+.claude/
