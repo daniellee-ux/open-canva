@@ -3,9 +3,22 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { copyBundledSkills } from './run';
 
-/** Pre-existing entries that don't make a target "non-empty" for scaffolding —
- *  a fresh `git init` directory is a legitimate place to scaffold into. */
-const SCAFFOLD_OK_ENTRIES = new Set(['.git', '.gitignore', '.DS_Store']);
+/** Pre-existing entries that don't make a target "non-empty" for scaffolding — a
+ *  fresh `git init` / `gh repo create` directory (license, readme, editor config)
+ *  is a legitimate place to scaffold into. */
+const SCAFFOLD_OK_ENTRIES = new Set([
+  '.git',
+  '.gitignore',
+  '.gitattributes',
+  '.DS_Store',
+  '.vscode',
+  '.idea',
+  'LICENSE',
+  'LICENSE.md',
+  'LICENSE.txt',
+  'README',
+  'README.md',
+]);
 
 /**
  * Scaffold a fresh OpenCanva project: config + starter design + both agent skill
@@ -30,11 +43,12 @@ export async function init(targetArg?: string): Promise<void> {
   }
   // Refuse to scaffold over real content (any entry except a fresh-repo allowlist —
   // including dotfiles like .env, so we don't silently clobber a configured dir).
-  if (existsSync(target) && readdirSync(target).some((n) => !SCAFFOLD_OK_ENTRIES.has(n))) {
+  const blockers = existsSync(target) ? readdirSync(target).filter((n) => !SCAFFOLD_OK_ENTRIES.has(n)) : [];
+  if (blockers.length) {
     if (existsSync(path.join(target, 'opencanva.config.ts'))) {
       console.error(`${target} already looks like an OpenCanva project. To refresh the bundled skills, run \`npm run sync\` there.`);
     } else {
-      console.error(`Target directory is not empty: ${target}\nPass an empty or new directory: opencanva init <dir>`);
+      console.error(`Target directory is not empty (${blockers.join(', ')}): ${target}\nPass an empty or new directory: opencanva init <dir>`);
     }
     process.exit(1);
   }
@@ -115,8 +129,11 @@ export async function init(targetArg?: string): Promise<void> {
   console.log('  • designs/start-here/');
   console.log('\nNext:');
   if (!inPlace) console.log(`  cd ${where}`);
+  // 0.0.x is the unpublished/local-build version: npm install can't resolve the
+  // pinned dep from the registry, so surface the link step inline before it fails.
+  if (corePkg.version.startsWith('0.0.')) {
+    console.log(`  npm link @opencanva/core   # @${corePkg.version} isn't on the registry yet — link a local checkout`);
+  }
   console.log('  npm install');
   console.log('  npm run dev      # → http://localhost:5173');
-  console.log(`\n(npm install needs @opencanva/core@${corePkg.version} on the registry; until it's`);
-  console.log("published, run `npm link @opencanva/core` from a local checkout.)");
 }

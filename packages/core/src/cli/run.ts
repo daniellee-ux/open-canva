@@ -81,7 +81,8 @@ export async function sync(): Promise<void> {
   }
   try {
     const names = copyBundledSkills(process.cwd());
-    console.log(`Synced ${names.length} skills → ${SKILL_DIRS.join(' + ')}/ (${names.join(', ')})`);
+    console.log(`Synced ${names.length} bundled skills → ${SKILL_DIRS.join(' + ')}/ (${names.join(', ')})`);
+    console.log('(bundled skills are replaced in full; your own skills in these dirs are left untouched)');
   } catch (err) {
     console.error(String((err as Error)?.message ?? err));
     process.exitCode = 1; // a real copy failure must be observable to callers / CI
