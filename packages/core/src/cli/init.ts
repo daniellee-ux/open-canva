@@ -22,8 +22,8 @@ const SCAFFOLD_OK_ENTRIES = new Set([
 
 /**
  * Scaffold a fresh OpenCanva project: config + starter design + both agent skill
- * dirs + an `AGENTS.md` (with `CLAUDE.md` symlinked to it), so a new project is
- * multi-agent ready out of the box.
+ * dirs + an `AGENTS.md` (with `CLAUDE.md` written as a byte-identical copy of it),
+ * so a new project is multi-agent ready out of the box.
  */
 export async function init(targetArg?: string): Promise<void> {
   if (targetArg?.startsWith('-')) {
