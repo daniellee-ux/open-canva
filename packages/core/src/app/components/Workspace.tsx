@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { designIds } from 'virtual:opencanva/designs';
+import { designIds, loadDesign } from 'virtual:opencanva/designs';
 import { designPresets, designToCssVars, resolveDesign, type DesignSystem } from '../../design';
 import { resolveArtboard } from '../../sdk';
 import { useDesignModule } from '../lib/use-design-module';
@@ -57,6 +57,10 @@ export function ThemeToggle({ theme, onToggle }: { theme: UiTheme; onToggle: () 
 
 function go(to: string) {
   return (e: React.MouseEvent) => {
+    // Let the browser handle modifier-clicks (open in new tab/window), any
+    // non-primary button, or an already-handled event natively — only intercept a
+    // plain left-click for in-place client navigation.
+    if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
     e.preventDefault();
     navigate(to);
   };
@@ -461,6 +465,27 @@ export function Home() {
       return { ...prev, [id]: m };
     });
   }, []);
+
+  // Prefetch every design's title/createdAt up front, independent of which cards
+  // are currently rendered. Otherwise a title-only query would filter a design out
+  // before its card mounts to report its meta — unmounting the card cancels the
+  // load, so it stays unfindable by title (a deadlock). loadDesign() is import-
+  // cached, so this shares the modules the grid cards load anyway.
+  useEffect(() => {
+    let cancelled = false;
+    for (const id of designIds) {
+      loadDesign(id)
+        .then((mod) => {
+          if (cancelled || !mod) return;
+          const meta = (mod as { meta?: DesignMeta }).meta;
+          onMeta(id, { title: meta?.title ?? id, createdAt: meta?.createdAt });
+        })
+        .catch(() => {});
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [onMeta]);
 
   // Scope to the selected folder (if any), then search within that scope.
   const scoped = useMemo(
