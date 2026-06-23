@@ -1,6 +1,6 @@
 {
   "name": "@opencanva/core",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "OpenCanva runtime, Vite plugin, and CLI — the agent-native graphic design framework.",
   "license": "Apache-2.0",
   "author": "Daniel Lee",
@@ -12,13 +12,18 @@
   },
   "type": "module",
   "bin": {
-    "opencanva": "./bin/opencanva.mjs"
+    "opencanva": "bin/opencanva.mjs"
   },
   "exports": {
     ".": "./src/index.ts",
     "./vite": "./src/vite/index.ts"
   },
-  "files": ["src", "bin", "skills", "template"],
+  "files": [
+    "src",
+    "bin",
+    "skills",
+    "template"
+  ],
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
