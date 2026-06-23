@@ -18,7 +18,7 @@
     ".": "./src/index.ts",
     "./vite": "./src/vite/index.ts"
   },
-  "files": ["src", "bin", "skills"],
+  "files": ["src", "bin", "skills", "template"],
   "scripts": {
     "typecheck": "tsc --noEmit"
   },

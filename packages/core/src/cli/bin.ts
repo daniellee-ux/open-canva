@@ -1,3 +1,4 @@
+import { init } from './init';
 import { build, dev, preview, sync } from './run';
 
 const cmd = process.argv[2];
@@ -17,8 +18,11 @@ async function main() {
     case 'sync':
       await sync();
       break;
+    case 'init':
+      await init(process.argv[3]);
+      break;
     default:
-      console.error(`Unknown command: ${cmd}\nUsage: opencanva <dev|build|preview|sync>`);
+      console.error(`Unknown command: ${cmd}\nUsage: opencanva <dev|build|preview|sync|init>`);
       process.exit(1);
   }
 }

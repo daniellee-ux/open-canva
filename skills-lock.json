@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "skills": {
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "path": "skills/frontend-design",
+      "ref": "57546260929473d4e0d1c1bb75297be2fdfa1949",
+      "computedHash": "60a88f9641e413f6436e0a3e99efccaa4370b80d2785a05a42ba73f7714a9126"
+    }
+  }
+}
