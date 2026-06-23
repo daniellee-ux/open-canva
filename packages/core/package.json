@@ -1,6 +1,6 @@
 {
   "name": "@opencanva/core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "OpenCanva runtime, Vite plugin, and CLI — the agent-native graphic design framework.",
   "license": "Apache-2.0",
   "author": "Daniel Lee",

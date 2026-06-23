@@ -54,6 +54,10 @@ export async function createViteConfig(opts: CreateViteConfigOptions): Promise<I
     base: config.base ?? '/',
     configFile: false,
     appType: 'spa',
+    // The app root lives inside the installed package
+    // (node_modules/@opencanva/core/src/app), so Vite's default cacheDir would
+    // land under the dependency. Pin it to the user's own project instead.
+    cacheDir: path.resolve(userCwd, 'node_modules/.vite/opencanva'),
     plugins: [
       locTagsPlugin({ designsRoot }),
       react(),
@@ -76,6 +80,11 @@ export async function createViteConfig(opts: CreateViteConfigOptions): Promise<I
       emptyOutDir: true,
     },
     optimizeDeps: {
+      // Force-prebundle React. With the app root inside the installed package,
+      // the dep scanner can miss react-dom/client and serve it as raw CJS — then
+      // `import { createRoot } from 'react-dom/client'` throws "does not provide
+      // an export named 'createRoot'" and the app never mounts (blank page).
+      include: ['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime', 'react/jsx-dev-runtime'],
       // Virtual modules must not be pre-bundled.
       exclude: ['virtual:opencanva/designs', 'virtual:opencanva/config'],
     },
