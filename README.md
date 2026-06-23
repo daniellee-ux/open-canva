@@ -9,9 +9,22 @@ discover files  →  virtual module  →  React component contract  →  click-t
 
 ## Quick start
 
+**Start a new project** — nothing to clone; this scaffolds a project and pulls `@opencanva/core` from npm:
+
 ```bash
+npm create opencanva@latest my-designs
+cd my-designs
 npm install
 npm run dev          # → http://localhost:5173
+```
+
+You get a ready-to-run project: a starter design under `designs/`, `opencanva.config.ts`, and `AGENTS.md` + skill folders so any AI agent (Claude Code, Codex, Cursor, …) can author for you out of the box.
+
+**Or explore / contribute to the framework itself:**
+
+```bash
+git clone https://github.com/daniellee-ux/open-canva
+cd open-canva && npm install && npm run dev
 ```
 
 Open a design at `/d/<id>`. Toggle **Edit** to select objects, drag to move, grab handles to resize/rotate, recolor, or leave a comment for your agent. Hit **Export** for PNG / SVG / PDF.
