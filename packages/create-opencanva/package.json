@@ -1,6 +1,6 @@
 {
   "name": "create-opencanva",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Scaffold a new OpenCanva project — `npm create opencanva@latest`.",
   "license": "Apache-2.0",
   "author": "Daniel Lee",
@@ -15,7 +15,7 @@
   "bin": {
     "create-opencanva": "bin/create-opencanva.mjs"
   },
-  "files": ["bin"],
+  "files": ["bin", "README.md"],
   "dependencies": {
     "@opencanva/core": "^0.1.0"
   }
