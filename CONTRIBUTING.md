@@ -10,6 +10,8 @@ the file contract, and the hard rules.
 
 ## Getting started
 
+Requires **Node ≥ 20.19** (or ≥ 22.12) — the floor Vite 7 enforces.
+
 ```bash
 npm install
 npm run dev          # → http://localhost:5173 ; open a design at /d/<id>

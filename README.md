@@ -9,6 +9,8 @@ discover files  →  virtual module  →  React component contract  →  click-t
 
 ## Quick start
 
+> Requires **Node ≥ 20.19** (or ≥ 22.12) — the version Vite 7 needs.
+
 **Start a new project** — nothing to clone; this scaffolds a project and pulls `@opencanva/core` from npm:
 
 ```bash

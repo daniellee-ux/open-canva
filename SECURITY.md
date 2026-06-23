@@ -50,3 +50,13 @@ shapes what's in scope:
   locally).
 
 When in doubt, report it — we'd rather triage a non-issue than miss a real one.
+
+## Known accepted advisories
+
+- **esbuild dev-server file read on Windows** ([GHSA-g7r4-m6w7-qqqr](https://github.com/advisories/GHSA-g7r4-m6w7-qqqr)) —
+  surfaced transitively by `npm audit` via Vite's pinned `esbuild`. It is **low
+  severity, Windows-only, and dev-server-only**, and it concerns esbuild's *own*
+  `serve` mode, which Vite does not use. The patched esbuild is outside Vite 7's
+  declared range, so there is no clean in-range bump yet. Per the out-of-scope
+  policy above we'll inherit the fix when Vite widens its esbuild range. This sits
+  squarely within the "local, dev-time tool on localhost" threat model.
