@@ -30,6 +30,19 @@ export interface DesignSystem {
   };
   /** Default corner radius (px) for boxes/images. */
   radius: number;
+  /**
+   * One-line style description. Shown in the /themes gallery and in the
+   * `create-design` skill's theme catalog so agents can match a user's stated
+   * vibe to a preset without interpreting raw hex values. Optional for inline
+   * per-design systems; every entry in `designPresets` should set it.
+   */
+  vibe?: string;
+  /**
+   * Mood / lightness keywords for the same matching purpose. Stick to the
+   * shared vocabulary so filtering works: `light`, `dark`, `bold`, `minimal`,
+   * `elegant`, `playful`, `warm`, `calm`, `retro`, `tech`, `editorial`.
+   */
+  tags?: string[];
 }
 
 export const defaultDesign: DesignSystem = {
@@ -46,6 +59,8 @@ export const defaultDesign: DesignSystem = {
     body: "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif",
   },
   radius: 24,
+  vibe: 'Warm coral and gold on deep charcoal — the confident default.',
+  tags: ['dark', 'bold', 'warm'],
 };
 
 /**
@@ -57,6 +72,10 @@ export const defaultDesign: DesignSystem = {
  * rather than declaring an inline `design`. (Exception: berry-smoothie keeps an
  * inline palette because its white-on-colored-blocks fg differs from the `berry`
  * theme's readable standalone fg.)
+ *
+ * Every preset must set `vibe` + `tags` — the create-design skill's theme
+ * catalog is generated from them (`npm run gen:catalog`, guarded by
+ * `npm run check:sync`).
  */
 export const designPresets: Record<string, DesignSystem> = {
   ember: defaultDesign,
@@ -74,6 +93,8 @@ export const designPresets: Record<string, DesignSystem> = {
       body: "ui-sans-serif, system-ui, 'Helvetica Neue', Arial, sans-serif",
     },
     radius: 0,
+    vibe: 'Film-noir black and white with a single gold flourish.',
+    tags: ['dark', 'elegant', 'minimal'],
   },
   sunset: {
     palette: {
@@ -89,6 +110,8 @@ export const designPresets: Record<string, DesignSystem> = {
       body: "ui-sans-serif, system-ui, -apple-system, sans-serif",
     },
     radius: 28,
+    vibe: 'Dusk plum glowing with coral and amber.',
+    tags: ['dark', 'warm', 'playful'],
   },
   mint: {
     palette: {
@@ -104,6 +127,8 @@ export const designPresets: Record<string, DesignSystem> = {
       body: "ui-sans-serif, system-ui, -apple-system, sans-serif",
     },
     radius: 20,
+    vibe: 'Fresh green and ocean blue on airy off-white.',
+    tags: ['light', 'calm', 'minimal'],
   },
   blueprint: {
     palette: {
@@ -119,6 +144,8 @@ export const designPresets: Record<string, DesignSystem> = {
       body: "ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace",
     },
     radius: 8,
+    vibe: 'Engineering blueprint — deep navy, cyan, all-mono type.',
+    tags: ['dark', 'tech', 'minimal'],
   },
   bubblegum: {
     palette: {
@@ -134,6 +161,8 @@ export const designPresets: Record<string, DesignSystem> = {
       body: "ui-sans-serif, system-ui, -apple-system, sans-serif",
     },
     radius: 32,
+    vibe: 'Candy pink and violet — soft, rounded, upbeat.',
+    tags: ['light', 'playful', 'bold'],
   },
   // Inspired by frontend-slides "Bold Signal" — confident, high-impact.
   'bold-signal': {
@@ -150,6 +179,8 @@ export const designPresets: Record<string, DesignSystem> = {
       body: "'Space Grotesk', ui-sans-serif, system-ui, sans-serif",
     },
     radius: 18,
+    vibe: 'High-impact near-black with signal orange and gold.',
+    tags: ['dark', 'bold'],
   },
   // Inspired by frontend-slides "Dark Botanical" — elegant, premium serif.
   botanical: {
@@ -166,6 +197,8 @@ export const designPresets: Record<string, DesignSystem> = {
       body: "'Space Grotesk', ui-sans-serif, system-ui, sans-serif",
     },
     radius: 8,
+    vibe: 'Premium dark serif with soft gold and blush.',
+    tags: ['dark', 'elegant', 'warm'],
   },
   // Inspired by frontend-slides "Swiss Modern" — Bauhaus, precise, red accent.
   swiss: {
@@ -182,6 +215,8 @@ export const designPresets: Record<string, DesignSystem> = {
       body: "'Space Grotesk', ui-sans-serif, system-ui, sans-serif",
     },
     radius: 0,
+    vibe: 'Bauhaus white, black grotesque type, one red accent.',
+    tags: ['light', 'bold', 'minimal', 'editorial'],
   },
 
   /* ---------- Extended gallery (verbatim from apps/demo design palettes) ---------- */
@@ -191,12 +226,16 @@ export const designPresets: Record<string, DesignSystem> = {
     palette: { bg: '#FFF8EE', fg: '#C7561E', muted: '#7A4A33', accent: '#F69834', accent2: '#F9C2BD', surface: '#FFFFFF' },
     fonts: { display: "'Poppins', ui-sans-serif, system-ui, sans-serif", body: "'Space Grotesk', ui-sans-serif, system-ui, sans-serif" },
     radius: 24,
+    vibe: 'Warm retro geometry — apricot orange on cream.',
+    tags: ['light', 'warm', 'retro', 'playful'],
   },
   // Avocado Press — clean duotone, blue + lime (avocado-market).
   avocado: {
     palette: { bg: '#FFFFFF', fg: '#0055A4', muted: '#9CC0E0', accent: '#0055A4', accent2: '#DCF4A2', surface: '#F2F8FF' },
     fonts: { display: "'Archivo Black', 'Syne', ui-sans-serif, system-ui, sans-serif", body: "'Space Grotesk', ui-sans-serif, system-ui, sans-serif" },
     radius: 8,
+    vibe: 'Crisp cobalt-and-lime duotone on white.',
+    tags: ['light', 'bold', 'minimal'],
   },
   // Berry Pop — fruity, raspberry + periwinkle. fg is a deep berry (readable on
   // the white bg) rather than berry-smoothie's white-on-colored-blocks fg, so the
@@ -205,132 +244,176 @@ export const designPresets: Record<string, DesignSystem> = {
     palette: { bg: '#FFFFFF', fg: '#6E1E3A', muted: '#9DB0E8', accent: '#9E2B50', accent2: '#C7D2F0', surface: '#FBF3F6' },
     fonts: { display: "'Syne', ui-sans-serif, system-ui, sans-serif", body: "'Manrope', ui-sans-serif, system-ui, sans-serif" },
     radius: 22,
+    vibe: 'Fruity raspberry and periwinkle — fresh and friendly.',
+    tags: ['light', 'playful', 'warm'],
   },
   // BlockFrame — maximalist candy, pink + blue (blockframe-fest).
   blockframe: {
     palette: { bg: '#FFFDF5', fg: '#000000', muted: '#7A7466', accent: '#FE90E8', accent2: '#F7CB46', surface: '#FFFFFF' },
     fonts: { display: "'Archivo Black', ui-sans-serif, system-ui, sans-serif", body: "'Space Grotesk', ui-sans-serif, system-ui, sans-serif" },
     radius: 0,
+    vibe: 'Maximalist candy — hot pink and mustard, hard edges.',
+    tags: ['light', 'bold', 'playful', 'retro'],
   },
   // Bold Poster — loud type, single red accent (bold-hiring).
   'bold-poster': {
     palette: { bg: '#FFFFFF', fg: '#1C1410', muted: '#8A8178', accent: '#D8000F', accent2: '#D8000F', surface: '#F5F2EF' },
     fonts: { display: "'Archivo Black', ui-sans-serif, system-ui, sans-serif", body: "'Space Grotesk', ui-sans-serif, system-ui, sans-serif" },
     radius: 0,
+    vibe: 'Loud poster type with one unmissable red.',
+    tags: ['light', 'bold', 'editorial'],
   },
   // Burst Panel — loud, energetic dashboard (burst-metrics).
   burst: {
     palette: { bg: '#FBD65A', fg: '#1E1E1E', muted: '#BD89E4', accent: '#AAE4BA', accent2: '#CFACE8', surface: '#CFACE8' },
     fonts: { display: "'Archivo Black', 'Space Grotesk', ui-sans-serif, system-ui, sans-serif", body: "'Space Grotesk', ui-sans-serif, system-ui, sans-serif" },
     radius: 18,
+    vibe: 'Sunny yellow dashboard energy with mint and lilac.',
+    tags: ['light', 'bold', 'playful'],
   },
   // Cobalt Bloom — oversized type, fashion editorial (cobalt-fashion).
   cobalt: {
     palette: { bg: '#DDA8A2', fg: '#171717', muted: '#B98A84', accent: '#4746C6', accent2: '#CE968F', surface: '#F4EFE9' },
     fonts: { display: "'Archivo Black', 'Syne', ui-sans-serif, system-ui, sans-serif", body: "'Space Grotesk', ui-sans-serif, system-ui, sans-serif" },
     radius: 0,
+    vibe: 'Fashion editorial — oversized type, cobalt on dusty rose.',
+    tags: ['light', 'bold', 'editorial'],
   },
   // Coral — warm, friendly, signature coral (coral-newsletter).
   coral: {
     palette: { bg: '#F5F0E8', fg: '#1A1A1A', muted: '#6B6B6B', accent: '#E85D5D', accent2: '#D44A4A', surface: '#FFFFFF' },
     fonts: { display: "'Fraunces', Georgia, serif", body: "'Manrope', ui-sans-serif, system-ui, sans-serif" },
     radius: 12,
+    vibe: 'Warm and friendly — signature coral on soft sand.',
+    tags: ['light', 'warm', 'calm'],
   },
   // Electric Studio — bold, clean, high-contrast blue (electric-update).
   electric: {
     palette: { bg: '#ffffff', fg: '#0a0a0a', muted: '#c7cdd6', accent: '#4361ee', accent2: '#d6ff3d', surface: '#f3f5fb' },
     fonts: { display: "'Manrope', ui-sans-serif, system-ui, sans-serif", body: "'Manrope', ui-sans-serif, system-ui, sans-serif" },
     radius: 18,
+    vibe: 'Clean high-contrast blue with a lime spark.',
+    tags: ['light', 'bold', 'tech'],
   },
   // Grove — editorial, parchment + forest green (grove-retreat).
   grove: {
     palette: { bg: '#e8e4d6', fg: '#192b1b', muted: '#7c7a66', accent: '#192b1b', accent2: '#c8524a', surface: '#dedad0' },
     fonts: { display: "'Fraunces', Georgia, serif", body: "'Work Sans', ui-sans-serif, system-ui, sans-serif" },
     radius: 6,
+    vibe: 'Parchment and forest green — quiet editorial.',
+    tags: ['light', 'editorial', 'calm', 'warm'],
   },
   // Jade Lens — calm, minimal green (jade-mindful).
   jade: {
     palette: { bg: '#F5F1EE', fg: '#1E2421', muted: '#08754C', accent: '#2BA483', accent2: '#2CAE8C', surface: '#EBE6E1' },
     fonts: { display: "'Fraunces', Georgia, serif", body: "'Manrope', ui-sans-serif, system-ui, sans-serif" },
     radius: 24,
+    vibe: 'Calm minimal green — soft and mindful.',
+    tags: ['light', 'calm', 'minimal'],
   },
   // Lime Slab — electric, bold, modern SaaS (lime-saas).
   lime: {
     palette: { bg: '#EEFA79', fg: '#0A0A05', muted: '#9A9A86', accent: '#EEFA79', accent2: '#FFFFF2', surface: '#FFFFF2' },
     fonts: { display: "'Archivo Black', ui-sans-serif, system-ui, sans-serif", body: "'Space Grotesk', ui-sans-serif, system-ui, sans-serif" },
     radius: 16,
+    vibe: 'Electric lime SaaS energy with black slab type.',
+    tags: ['light', 'bold', 'tech'],
   },
   // Macchiato — warm monochrome, almond + espresso (macchiato-menu).
   macchiato: {
     palette: { bg: '#EDE7DD', fg: '#25211B', muted: '#6E6558', accent: '#9A917F', accent2: '#9A917F', surface: '#E5DECF' },
     fonts: { display: "'Fraunces', Georgia, serif", body: "'Work Sans', ui-sans-serif, system-ui, sans-serif" },
     radius: 14,
+    vibe: 'Warm monochrome — almond, cream, espresso.',
+    tags: ['light', 'warm', 'minimal', 'elegant'],
   },
   // Monochrome — quiet, text-first (monochrome-manifesto).
   monochrome: {
     palette: { bg: '#FAFADF', fg: '#1A1A16', muted: '#5E5E54', accent: '#1A1A16', accent2: '#8A8A80', surface: '#F0F0D4' },
     fonts: { display: "'Fraunces', Georgia, 'Times New Roman', serif", body: "'Work Sans', ui-sans-serif, system-ui, sans-serif" },
     radius: 2,
+    vibe: 'Quiet text-first ivory in near-mono ink.',
+    tags: ['light', 'minimal', 'editorial'],
   },
   // Neon Cyber — futuristic navy, cyan + magenta (neon-hackathon).
   neon: {
     palette: { bg: '#0a0f1c', fg: '#eafffb', muted: '#7c8aa6', accent: '#00ffcc', accent2: '#ff00aa', surface: '#111a2e' },
     fonts: { display: "'Space Grotesk', ui-sans-serif, system-ui, sans-serif", body: "'Manrope', ui-sans-serif, system-ui, sans-serif" },
     radius: 28,
+    vibe: 'Futuristic navy with cyan and magenta neon.',
+    tags: ['dark', 'tech', 'bold'],
   },
   // Notebook Tabs — cream editorial paper (notebook-reading).
   notebook: {
     palette: { bg: '#F4EEE3', fg: '#1a1a1a', muted: '#8a8a8a', accent: '#c7967a', accent2: '#98d4bb', surface: '#f8f6f1' },
     fonts: { display: "'Bodoni Moda', Georgia, serif", body: "'DM Sans', ui-sans-serif, system-ui, sans-serif" },
     radius: 20,
+    vibe: 'Cream paper editorial with soft tabbed accents.',
+    tags: ['light', 'editorial', 'elegant', 'calm'],
   },
   // Papier Bleu — Matisse calm, aqua + navy (papier-gallery).
   papier: {
     palette: { bg: '#FAF3EB', fg: '#1A3C8F', muted: '#8FA6C4', accent: '#72D0E9', accent2: '#4FB8D8', surface: '#F1E7DA' },
     fonts: { display: "'Fraunces', Georgia, serif", body: "'Work Sans', ui-sans-serif, system-ui, sans-serif" },
     radius: 28,
+    vibe: 'Matisse paper-cut calm — aqua and navy on warm paper.',
+    tags: ['light', 'calm', 'playful'],
   },
   // Riptide Cobalt — bold poster, high impact (riptide-surf).
   riptide: {
     palette: { bg: '#FDF0E0', fg: '#1A2240', muted: '#8A93B8', accent: '#375DFE', accent2: '#2741C0', surface: '#FFFFFF' },
     fonts: { display: "'Archivo Black', ui-sans-serif, system-ui, sans-serif", body: "'Space Grotesk', ui-sans-serif, system-ui, sans-serif" },
     radius: 0,
+    vibe: 'High-impact cobalt poster on warm sand.',
+    tags: ['light', 'bold', 'editorial'],
   },
   // Salmon Stamp — clean stamp poster, salmon + green (salmon-plant-sale).
   salmon: {
     palette: { bg: '#FFFFFF', fg: '#000000', muted: '#9aa39c', accent: '#F0AE9E', accent2: '#049550', surface: '#FBF1EE' },
     fonts: { display: "'Archivo Black', ui-sans-serif, system-ui, sans-serif", body: "'Space Grotesk', ui-sans-serif, system-ui, sans-serif" },
     radius: 6,
+    vibe: 'Clean stamp poster — salmon and leaf green on white.',
+    tags: ['light', 'minimal', 'playful'],
   },
   // Specimen Bold — type specimen, graphic, loud (specimen-type).
   specimen: {
     palette: { bg: '#F3F3F3', fg: '#2E302E', muted: '#6B6E6B', accent: '#3EC06A', accent2: '#FBEF4A', surface: '#E7E7E3' },
     fonts: { display: "'Archivo Black', ui-sans-serif, system-ui, sans-serif", body: "'Space Grotesk', ui-sans-serif, system-ui, sans-serif" },
     radius: 0,
+    vibe: 'Loud type-specimen graphics — green and acid yellow.',
+    tags: ['light', 'bold', 'editorial'],
   },
   // Terminal — developer shiplog, green-on-ink mono (terminal-shiplog).
   terminal: {
     palette: { bg: '#0d1117', fg: '#e6edf3', muted: '#7d8590', accent: '#39d353', accent2: '#58a6ff', surface: '#10161e' },
     fonts: { display: "'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace", body: "'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace" },
     radius: 16,
+    vibe: 'Developer terminal — green-on-ink monospace.',
+    tags: ['dark', 'tech', 'minimal'],
   },
   // Vintage Editorial — witty, distinctive serif on cream (vintage-hottake).
   vintage: {
     palette: { bg: '#f5f3ee', fg: '#1a1a1a', muted: '#9b948a', accent: '#e8d4c0', accent2: '#c46a3f', surface: '#ece7dd' },
     fonts: { display: "'Fraunces', Georgia, serif", body: "'Work Sans', ui-sans-serif, system-ui, sans-serif" },
     radius: 8,
+    vibe: 'Witty vintage serif on cream with a terracotta wink.',
+    tags: ['light', 'retro', 'editorial', 'elegant'],
   },
   // Violet Marker — highlighter, violet + lime (violet-study).
   violet: {
     palette: { bg: '#FFFFFF', fg: '#000000', muted: '#666463', accent: '#C5A1FF', accent2: '#CFEE30', surface: '#FAFAF8' },
     fonts: { display: "'Archivo Black', 'Space Grotesk', system-ui, sans-serif", body: "'Space Grotesk', ui-sans-serif, system-ui, sans-serif" },
     radius: 10,
+    vibe: 'Highlighter violet and lime marker energy.',
+    tags: ['light', 'playful', 'bold'],
   },
   // Creative Voltage — electric blue + neon yellow (voltage-night).
   voltage: {
     palette: { bg: '#1a1a2e', fg: '#ffffff', muted: '#8a8ab0', accent: '#0066ff', accent2: '#d4ff00', surface: '#23233f' },
     fonts: { display: "'Syne', ui-sans-serif, system-ui, sans-serif", body: "'Space Mono', ui-monospace, monospace" },
     radius: 24,
+    vibe: 'Night-mode electric blue and neon yellow.',
+    tags: ['dark', 'bold', 'tech'],
   },
 };
 

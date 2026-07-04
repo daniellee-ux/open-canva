@@ -26,13 +26,15 @@ export const design: DesignSystem = {
     body: "ui-sans-serif, system-ui, -apple-system, sans-serif", // copy
   },
   radius: 24,            // default corner radius (px)
+  vibe: 'Warm ember on deep charcoal.',  // one-line style description (required for presets)
+  tags: ['dark', 'bold', 'warm'],        // from: light, dark, bold, minimal, elegant, playful, warm, calm, retro, tech, editorial
 };
 ```
 
 ## Two ways to use it
 
 1. **Per design** — add `export const design` to a `designs/<id>/index.tsx` (overrides any `meta.theme`).
-2. **Shared preset** — add a named entry to `designPresets` in `packages/core/src/design.ts`, then designs select it with `meta: { theme: 'your-name' }`. This also makes it show up in the `/themes` gallery.
+2. **Shared preset** — add a named entry to `designPresets` in `packages/core/src/design.ts`, then designs select it with `meta: { theme: 'your-name' }`. This also makes it show up in the `/themes` gallery. Presets must set `vibe` + `tags`; afterwards run `npm run gen:catalog && npm run sync` so the `create-design` skill's theme catalog includes it (CI's `check:sync` fails otherwise).
 
 ## Design guidance
 

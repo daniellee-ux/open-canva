@@ -2801,6 +2801,32 @@ code {
   font-weight: 400;
   font-size: 11px;
 }
+.ox-theme-vibe {
+  color: var(--ui-muted);
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.ox-theme-vibe-detail {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ui-muted);
+}
+.ox-theme-tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ox-theme-tag {
+  font-family: var(--ui-mono);
+  font-size: 11px;
+  color: var(--ui-muted);
+  border: 1px solid var(--ui-line);
+  border-radius: 999px;
+  padding: 2px 9px;
+  background: var(--ui-panel-2);
+}
 
 .ox-msg {
   max-width: 640px;

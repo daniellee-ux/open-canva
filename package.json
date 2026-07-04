@@ -33,6 +33,7 @@
     "preview": "npm run preview -w @opencanva/demo",
     "typecheck": "npm run typecheck -w @opencanva/core",
     "sync": "npm run sync -w @opencanva/demo",
-    "check:sync": "node scripts/check-repo-sync.mjs"
+    "gen:catalog": "tsx scripts/gen-theme-catalog.mts",
+    "check:sync": "node scripts/check-repo-sync.mjs && tsx scripts/gen-theme-catalog.mts --check"
   }
 }
