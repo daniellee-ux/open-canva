@@ -21,6 +21,8 @@ export interface Viewport {
   /** Pan by a screen-pixel delta (used by the inspector's edit-mode pan gesture). */
   panBy: (dx: number, dy: number) => void;
   fit: () => void;
+  /** Zoom + center on one canvas-space rect (e.g. a single board). */
+  fitTo: (rect: { x: number; y: number; w: number; h: number }) => void;
   actualSize: () => void;
 }
 
@@ -56,16 +58,27 @@ export function useViewport(
     setZoom(z1);
   }, []);
 
+  const fitTo = useCallback(
+    (r: { x: number; y: number; w: number; h: number }) => {
+      const stage = stageRef.current;
+      if (!stage || !r.w || !r.h) return;
+      const rect = stage.getBoundingClientRect();
+      const pad = 0.86;
+      const z = clamp(Math.min(rect.width / r.w, rect.height / r.h) * pad);
+      setZoom(z);
+      // Center the rect: a canvas point p lands on screen at p·z + pan.
+      setPan({
+        x: (rect.width - r.w * z) / 2 - r.x * z,
+        y: (rect.height - r.h * z) / 2 - r.y * z,
+      });
+    },
+    [stageRef],
+  );
+
   const fit = useCallback(() => {
-    const stage = stageRef.current;
     const { w, h } = contentRef.current;
-    if (!stage || !w || !h) return;
-    const rect = stage.getBoundingClientRect();
-    const pad = 0.86;
-    const z = clamp(Math.min(rect.width / w, rect.height / h) * pad);
-    setZoom(z);
-    setPan({ x: (rect.width - w * z) / 2, y: (rect.height - h * z) / 2 });
-  }, [stageRef]);
+    fitTo({ x: 0, y: 0, w, h });
+  }, [fitTo]);
 
   const actualSize = useCallback(() => {
     const stage = stageRef.current;
@@ -223,6 +236,7 @@ export function useViewport(
     zoomTo,
     panBy,
     fit,
+    fitTo,
     actualSize,
   };
 }

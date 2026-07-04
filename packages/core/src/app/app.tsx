@@ -100,6 +100,19 @@ function DesignPage({ id }: { id: string }) {
   const layout = useMemo(() => layoutBoards(scenes, mod?.artboard), [scenes, mod]);
   const vp = useViewport(stageRef, { w: layout.w, h: layout.h });
 
+  // Focus a board: make it active (toolbar, layers panel) AND bring it into
+  // view — zoom-to-board, so picking a board visibly navigates the canvas.
+  const focusBoard = (i: number) => {
+    setActiveBoard(i);
+    const b = layout.boards[i];
+    if (!b) return;
+    // Include the caption floating above the board (bottom: 100% + 12px margin,
+    // ~29 canvas px) in the fitted rect, or small boards clip their name off
+    // the top of the stage.
+    const captionH = 32;
+    vp.fitTo({ x: b.x, y: b.y - captionH, w: b.artboard.w, h: b.artboard.h + captionH });
+  };
+
   // Report the editor's cursor to .opencanva/current.json (the current-design skill).
   useEffect(() => {
     const hot = import.meta.hot;
@@ -231,7 +244,7 @@ function DesignPage({ id }: { id: string }) {
               label="Active board"
               value={activeBoard}
               options={scenes.map((s, i) => ({ value: i, label: s.label ?? s.id ?? `Board ${i + 1}` }))}
-              onChange={setActiveBoard}
+              onChange={focusBoard}
             />
           )}
 
@@ -267,7 +280,7 @@ function DesignPage({ id }: { id: string }) {
             scenes={scenes}
             designKey={id}
             activeBoard={activeBoard}
-            onFocusBoard={(i) => { setActiveBoard(i); vp.fit(); }}
+            onFocusBoard={focusBoard}
             design={design}
             moduleArtboard={mod.artboard}
             selectedEl={selectedEl}
