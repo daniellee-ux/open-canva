@@ -452,7 +452,9 @@ code {
 .ox-board-slot {
   position: absolute;
 }
-.ox-board-label {
+/* Caption floating above each board on the canvas. Distinct from the layers
+   panel's .ox-board-label row text — keep the two class names separate. */
+.ox-board-caption {
   position: absolute;
   bottom: 100%;
   left: 2px;
@@ -476,7 +478,13 @@ code {
   background: var(--ui-panel);
   border-right: 1px solid var(--ui-line);
   overflow-y: auto;
-  padding: 12px 0;
+  /* No top padding on the scroll container: sticky group heads pin to its
+     content edge, and a padded edge leaves a strip rows scroll through. The
+     top breathing room lives on the first child instead. */
+  padding: 0 0 12px;
+}
+.ox-layers > :first-child {
+  margin-top: 12px;
 }
 .ox-layers-section {
   padding: 14px 16px 6px;
@@ -587,6 +595,64 @@ code {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* Per-board layer groups (multi-board designs) — Figma-style collapsible
+   sections. The header sticks while its group scrolls so the board context
+   never leaves view. */
+.ox-layers-group-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 7px 16px 7px 10px;
+  border: none;
+  background: var(--ui-panel);
+  color: var(--ui-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--ui-t) var(--ui-ease);
+}
+.ox-layers-group-head:hover {
+  color: var(--ui-fg);
+}
+.ox-layers-group.is-active .ox-layers-group-head {
+  color: var(--ui-fg);
+}
+.ox-layers-group-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  color: var(--ui-faint);
+  transform: rotate(-90deg);
+  transition: transform var(--ui-t) var(--ui-ease);
+}
+.ox-layers-group-head.is-open .ox-layers-group-caret {
+  transform: rotate(0deg);
+}
+.ox-layers-group-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ox-layers-group-head .ox-layers-count {
+  margin-left: auto;
+  padding-left: 8px;
+}
+.ox-layers-group + .ox-layers-group {
+  margin-top: 2px;
+}
+/* scrollIntoView targets must clear the stuck group head above them. */
+.ox-layers-group .ox-layers-objs li {
+  scroll-margin-top: 36px;
 }
 .ox-layers-objs {
   list-style: none;
@@ -1734,9 +1800,16 @@ code {
 .ox-dd-list {
   max-height: min(60vh, 380px);
   overflow-y: auto;
+  /* Labels can carry user content (board names in the Export menu) — cap the
+     popover and ellipsize instead of stretching across the viewport. */
+  max-width: min(90vw, 320px);
 }
 .ox-dd-label {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .ox-dd-tick {
   flex: 0 0 auto;

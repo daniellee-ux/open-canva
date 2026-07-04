@@ -23,6 +23,8 @@ interface ObjRow {
   y: number;
   /** Nesting depth (objects inside a Group/Box), for the indented layer tree. */
   depth: number;
+  /** Index of the canvas board this object lives on, for per-board grouping. */
+  board: number;
   /** Stable per-element React key, so reordering rows doesn't strand a hover class. */
   key: number;
 }
@@ -56,6 +58,10 @@ export function LayersPanel({
   selectedEl?: HTMLElement | null;
 }) {
   const [rows, setRows] = useState<ObjRow[]>([]);
+  // Per-board expand/collapse overrides for the grouped layer tree. Without an
+  // override a group is open iff its board is active, so switching boards
+  // "filters" the tree to the focused board while still allowing a manual peek.
+  const [openOverrides, setOpenOverrides] = useState<Record<number, boolean>>({});
   const tick = useRef(0);
   const activeBoardRef = useRef<HTMLLIElement>(null);
   const selectedRowRef = useRef<HTMLLIElement>(null);
@@ -83,10 +89,50 @@ export function LayersPanel({
     activeBoardRef.current?.scrollIntoView({ block: 'nearest' });
   }, [activeBoard]);
 
-  // Bring the selected object's row into view (canvas selection → panel).
+  // Reset expand/collapse overrides when the focus context changes, so the tree
+  // always re-opens on (only) the newly active board's group. Overrides are
+  // keyed by board index, so a structural change (delete/duplicate/reorder —
+  // anything that alters the id sequence) must also reset them or they'd stick
+  // to the wrong boards; plain content edits keep the sequence and the state.
+  const boardsSig = scenes.map((s) => s.id ?? '').join('|');
   useEffect(() => {
-    if (selectedEl) selectedRowRef.current?.scrollIntoView({ block: 'nearest' });
-  }, [selectedEl]);
+    setOpenOverrides({});
+  }, [activeBoard, designKey, boardsSig]);
+
+  // A canvas selection can land in a collapsed group (an object on a non-active
+  // board, or on the active board after a manual collapse) — force that group
+  // open so the selected row exists to highlight and scroll to. Latched per
+  // element: the effect's rows/activeBoard deps churn (MutationObserver refresh,
+  // board switches with a stale selection), and re-forcing on churn would both
+  // defeat a manual collapse and resurrect overrides the reset above just wiped.
+  const lastForced = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!selectedEl) {
+      lastForced.current = null;
+      return;
+    }
+    if (lastForced.current === selectedEl) return;
+    const board = rows.find((r) => r.el === selectedEl)?.board;
+    if (board == null) return; // rows may lag the DOM; retry on the next refresh
+    lastForced.current = selectedEl;
+    setOpenOverrides((o) => ((o[board] ?? board === activeBoard) ? o : { ...o, [board]: true }));
+  }, [selectedEl, rows, activeBoard]);
+
+  // Bring the selected object's row into view (canvas selection → panel), once
+  // per selection. openOverrides is a dep so a selection landing on a collapsed
+  // group retries after the forced expand mounts the row — but a manual
+  // expand/collapse elsewhere must not yank the scroll back here.
+  const lastScrolled = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!selectedEl) {
+      lastScrolled.current = null;
+      return;
+    }
+    if (selectedRowRef.current && lastScrolled.current !== selectedEl) {
+      selectedRowRef.current.scrollIntoView({ block: 'nearest' });
+      lastScrolled.current = selectedEl;
+    }
+  }, [selectedEl, openOverrides]);
 
   useEffect(() => {
     const canvas = document.querySelector<HTMLElement>('.ox-canvas');
@@ -102,6 +148,12 @@ export function LayersPanel({
         }
         return d;
       };
+      // Canvas boards render in scenes order, so DOM index == scene index.
+      const boardEls = Array.from(canvas.querySelectorAll<HTMLElement>('[data-ox-board]'));
+      const boardOf = (el: HTMLElement) => {
+        const board = el.closest<HTMLElement>('[data-ox-board]');
+        return board ? Math.max(0, boardEls.indexOf(board)) : 0;
+      };
       const objs = Array.from(canvas.querySelectorAll<HTMLElement>('[data-ox-obj]'));
       setRows(
         objs.map((el) => ({
@@ -115,6 +167,7 @@ export function LayersPanel({
           x: Number(el.getAttribute('data-ox-x') ?? 0),
           y: Number(el.getAttribute('data-ox-y') ?? 0),
           depth: depthOf(el),
+          board: boardOf(el),
           key: keyFor(el),
         })),
       );
@@ -164,105 +217,137 @@ export function LayersPanel({
     fire();
   };
 
+  const boardsRail =
+    scenes.length > 1 ? (
+      <>
+        <div className="ox-layers-section">Boards</div>
+        <ul className="ox-layers-boards">
+          {scenes.map((s, i) => (
+            <li
+              // Index-suffixed so a duplicated board (which shares the source
+              // component's id) can't collide with its twin.
+              key={`${s.id ?? 'scene'}-${i}`}
+              ref={i === activeBoard ? activeBoardRef : undefined}
+              className={`${i === activeBoard ? 'is-active' : ''}${dropIdx === i ? ' is-drop' : ''}`}
+              draggable={isDev}
+              onDragStart={(e) => {
+                dragIdx.current = i;
+                e.dataTransfer.effectAllowed = 'move';
+              }}
+              onDragOver={(e) => {
+                if (dragIdx.current == null) return;
+                e.preventDefault();
+                setDropIdx(i);
+              }}
+              onDragLeave={() => setDropIdx((d) => (d === i ? null : d))}
+              onDrop={(e) => {
+                e.preventDefault();
+                const from = dragIdx.current;
+                dragIdx.current = null;
+                setDropIdx(null);
+                if (from == null || from === i) return;
+                const order = scenes.map((_, k) => k);
+                const [m] = order.splice(from, 1);
+                order.splice(i, 0, m);
+                onBoardOp(reorderBoards(designKey, order), 'Boards reordered');
+              }}
+              onDragEnd={() => {
+                dragIdx.current = null;
+                setDropIdx(null);
+              }}
+            >
+              <button type="button" aria-current={i === activeBoard ? 'true' : undefined} onClick={() => onFocusBoard(i)}>
+                <ThumbBoard
+                  scene={s}
+                  artboard={resolveArtboard(s, moduleArtboard)}
+                  design={design}
+                  className="ox-board-thumb"
+                />
+                <span className="ox-board-name">
+                  <span className="ox-board-index">{String(i + 1).padStart(2, '0')}</span>
+                  <span className="ox-board-label">{s.label ?? s.id ?? `Board ${i + 1}`}</span>
+                </span>
+              </button>
+              {isDev ? (
+                <div className="ox-board-menu">
+                  <Menu
+                    label={`Board ${i + 1} actions`}
+                    button={<span className="ox-board-menu-btn"><Icon name="caret" size={14} /></span>}
+                    items={[
+                      { label: 'Duplicate', icon: 'group', onSelect: () => onBoardOp(duplicateBoard(designKey, i), 'Board duplicated') },
+                      {
+                        label: 'Delete',
+                        icon: 'close',
+                        danger: true,
+                        disabled: scenes.length <= 1,
+                        onSelect: () => onBoardOp(deleteBoard(designKey, i), 'Board deleted'),
+                      },
+                    ]}
+                  />
+                </div>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      </>
+    ) : null;
+
+  const renderRow = (r: ObjRow) => (
+    <li
+      key={r.key}
+      ref={r.el === selectedEl ? selectedRowRef : undefined}
+      className={`${r.type === 'group' ? 'is-group' : r.depth > 0 ? 'is-child' : ''}${r.el === selectedEl ? ' is-selected' : ''}`.trim() || undefined}
+      style={{ paddingLeft: 10 + r.depth * 16 }}
+      onMouseEnter={() => peek(r.el, true)}
+      onMouseLeave={() => peek(r.el, false)}
+      onClick={() => selectObj(r.el)}
+    >
+      <span className="ox-layer-chip">
+        <span className="ox-layer-glyph"><Icon name={TYPE_ICON[r.type] ?? 'dot'} size={14} /></span>
+        <span className="ox-layer-label">{r.label}</span>
+        <span className="ox-layer-pos">{r.x},{r.y}</span>
+      </span>
+    </li>
+  );
+
+  const isOpen = (i: number) => openOverrides[i] ?? i === activeBoard;
+
   return (
     <aside className="ox-layers">
-      {scenes.length > 1 ? (
-        <>
-          <div className="ox-layers-section">Boards</div>
-          <ul className="ox-layers-boards">
-            {scenes.map((s, i) => (
-              <li
-                // Index-suffixed so a duplicated board (which shares the source
-                // component's id) can't collide with its twin.
-                key={`${s.id ?? 'scene'}-${i}`}
-                ref={i === activeBoard ? activeBoardRef : undefined}
-                className={`${i === activeBoard ? 'is-active' : ''}${dropIdx === i ? ' is-drop' : ''}`}
-                draggable={isDev}
-                onDragStart={(e) => {
-                  dragIdx.current = i;
-                  e.dataTransfer.effectAllowed = 'move';
-                }}
-                onDragOver={(e) => {
-                  if (dragIdx.current == null) return;
-                  e.preventDefault();
-                  setDropIdx(i);
-                }}
-                onDragLeave={() => setDropIdx((d) => (d === i ? null : d))}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const from = dragIdx.current;
-                  dragIdx.current = null;
-                  setDropIdx(null);
-                  if (from == null || from === i) return;
-                  const order = scenes.map((_, k) => k);
-                  const [m] = order.splice(from, 1);
-                  order.splice(i, 0, m);
-                  onBoardOp(reorderBoards(designKey, order), 'Boards reordered');
-                }}
-                onDragEnd={() => {
-                  dragIdx.current = null;
-                  setDropIdx(null);
-                }}
-              >
-                <button type="button" aria-current={i === activeBoard ? 'true' : undefined} onClick={() => onFocusBoard(i)}>
-                  <ThumbBoard
-                    scene={s}
-                    artboard={resolveArtboard(s, moduleArtboard)}
-                    design={design}
-                    className="ox-board-thumb"
-                  />
-                  <span className="ox-board-name">
-                    <span className="ox-board-index">{String(i + 1).padStart(2, '0')}</span>
-                    <span className="ox-board-label">{s.label ?? s.id ?? `Board ${i + 1}`}</span>
-                  </span>
-                </button>
-                {isDev ? (
-                  <div className="ox-board-menu">
-                    <Menu
-                      label={`Board ${i + 1} actions`}
-                      button={<span className="ox-board-menu-btn"><Icon name="caret" size={14} /></span>}
-                      items={[
-                        { label: 'Duplicate', icon: 'group', onSelect: () => onBoardOp(duplicateBoard(designKey, i), 'Board duplicated') },
-                        {
-                          label: 'Delete',
-                          icon: 'close',
-                          danger: true,
-                          disabled: scenes.length <= 1,
-                          onSelect: () => onBoardOp(deleteBoard(designKey, i), 'Board deleted'),
-                        },
-                      ]}
-                    />
-                  </div>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : null}
+      {boardsRail}
 
       <div className="ox-layers-section">
         Layers <span className="ox-layers-count">{rows.length}</span>
       </div>
-      <ul className="ox-layers-objs">
-        {rows.length === 0 ? <li className="ox-layers-empty">No objects yet</li> : null}
-        {rows.map((r) => (
-          <li
-            key={r.key}
-            ref={r.el === selectedEl ? selectedRowRef : undefined}
-            className={`${r.type === 'group' ? 'is-group' : r.depth > 0 ? 'is-child' : ''}${r.el === selectedEl ? ' is-selected' : ''}`.trim() || undefined}
-            style={{ paddingLeft: 10 + r.depth * 16 }}
-            onMouseEnter={() => peek(r.el, true)}
-            onMouseLeave={() => peek(r.el, false)}
-            onClick={() => selectObj(r.el)}
-          >
-            <span className="ox-layer-chip">
-              <span className="ox-layer-glyph"><Icon name={TYPE_ICON[r.type] ?? 'dot'} size={14} /></span>
-              <span className="ox-layer-label">{r.label}</span>
-              <span className="ox-layer-pos">{r.x},{r.y}</span>
-            </span>
-          </li>
-        ))}
-      </ul>
+      {scenes.length > 1 ? (
+        scenes.map((s, i) => {
+          const group = rows.filter((r) => r.board === i);
+          const open = isOpen(i);
+          return (
+            <section key={`${s.id ?? 'scene'}-${i}`} className={`ox-layers-group${i === activeBoard ? ' is-active' : ''}`}>
+              <button
+                type="button"
+                className={`ox-layers-group-head${open ? ' is-open' : ''}`}
+                aria-expanded={open}
+                onClick={() => setOpenOverrides((o) => ({ ...o, [i]: !open }))}
+              >
+                <span className="ox-layers-group-caret"><Icon name="caret" size={12} /></span>
+                <span className="ox-layers-group-label">{s.label ?? s.id ?? `Board ${i + 1}`}</span>
+                <span className="ox-layers-count">{group.length}</span>
+              </button>
+              {open ? (
+                <ul className="ox-layers-objs">
+                  {group.length === 0 ? <li className="ox-layers-empty">Empty board</li> : group.map(renderRow)}
+                </ul>
+              ) : null}
+            </section>
+          );
+        })
+      ) : (
+        <ul className="ox-layers-objs">
+          {rows.length === 0 ? <li className="ox-layers-empty">No objects yet</li> : rows.map(renderRow)}
+        </ul>
+      )}
     </aside>
   );
 }

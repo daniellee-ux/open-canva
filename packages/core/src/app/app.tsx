@@ -9,7 +9,7 @@ import { useAgentSocketConnected } from './lib/use-agent-socket';
 import { navigate } from './lib/navigate';
 import { findLayoutIssues } from './lib/overflow';
 import { useViewport } from './lib/viewport';
-import { boardToPngDataUrl, exportPdf, exportPng, exportSvg } from './lib/export';
+import { boardToPngDataUrl, exportPdf, exportPdfPages, exportPng, exportSvg, exportZip } from './lib/export';
 import { Stage, layoutBoards } from './components/Stage';
 import { Inspector } from './components/Inspector';
 import { LayersPanel } from './components/LayersPanel';
@@ -17,7 +17,7 @@ import { AssetsPanel } from './components/AssetsPanel';
 import { TokensPanel } from './components/TokensPanel';
 import { Home, ThemesPage, ThemeDetail, ThemeToggle } from './components/Workspace';
 import { ToastHost, toast } from './components/ui/toast';
-import { Menu, SelectMenu } from './components/ui/Menu';
+import { Menu } from './components/ui/Menu';
 import { Icon } from './components/icons';
 
 const isDev = import.meta.env.DEV;
@@ -100,6 +100,19 @@ function DesignPage({ id }: { id: string }) {
   const layout = useMemo(() => layoutBoards(scenes, mod?.artboard), [scenes, mod]);
   const vp = useViewport(stageRef, { w: layout.w, h: layout.h });
 
+  // Focus a board: make it active (toolbar, layers panel) AND bring it into
+  // view — zoom-to-board, so picking a board visibly navigates the canvas.
+  const focusBoard = (i: number) => {
+    setActiveBoard(i);
+    const b = layout.boards[i];
+    if (!b) return;
+    // Include the caption floating above the board (bottom: 100% + 12px margin,
+    // ~29 canvas px) in the fitted rect, or small boards clip their name off
+    // the top of the stage.
+    const captionH = 32;
+    vp.fitTo({ x: b.x, y: b.y - captionH, w: b.artboard.w, h: b.artboard.h + captionH });
+  };
+
   // Report the editor's cursor to .opencanva/current.json (the current-design skill).
   useEffect(() => {
     const hot = import.meta.hot;
@@ -164,6 +177,10 @@ function DesignPage({ id }: { id: string }) {
   }
   if (!mod) return <div className="ox-msg"><span className="ox-loading">Loading {id}…</span></div>;
 
+  const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  const slug = slugify(title) || id;
+  const boardName = (i: number) => scenes[i]?.label ?? scenes[i]?.id ?? `Board ${i + 1}`;
+
   const doExport = async (kind: 'png' | 'svg' | 'pdf') => {
     if (exporting) return; // lock out concurrent exports
     // Scope to the live canvas: LayersPanel thumbnails also render real `.ox-board`
@@ -175,7 +192,6 @@ function DesignPage({ id }: { id: string }) {
       toast.err('Nothing to export — no board is rendered.');
       return;
     }
-    const slug = (title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || id);
     const fname = `${slug}${scenes.length > 1 ? `-${activeBoard + 1}` : ''}`;
     setExporting(kind);
     try {
@@ -183,6 +199,36 @@ function DesignPage({ id }: { id: string }) {
       else if (kind === 'svg') await exportSvg(board, at.w, at.h, fname);
       else await exportPdf(board, at.w, at.h, fname);
       toast.ok(`Exported ${fname}.${kind}`);
+    } catch (err) {
+      toast.err(`Export failed: ${String((err as Error)?.message ?? err)}`);
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  // Export every board: PDF gets one page per board; PNG/SVG get one file per
+  // board bundled in a .zip (browsers throttle multi-file downloads).
+  const doExportAll = async (kind: 'png' | 'svg' | 'pdf') => {
+    if (exporting) return;
+    const boardEls = document.querySelectorAll<HTMLElement>('.ox-canvas .ox-board');
+    const items = layout.boards
+      .map((b, i) => ({
+        el: boardEls[i],
+        w: b.artboard.w,
+        h: b.artboard.h,
+        name: `${String(i + 1).padStart(2, '0')}-${slugify(boardName(i)) || `board-${i + 1}`}`,
+      }))
+      .filter((it) => it.el);
+    if (!items.length) {
+      toast.err('Nothing to export — no board is rendered.');
+      return;
+    }
+    setExporting(kind);
+    try {
+      const fname = kind === 'pdf' ? slug : `${slug}-boards`;
+      if (kind === 'pdf') await exportPdfPages(items, fname);
+      else await exportZip(items, fname, kind);
+      toast.ok(`Exported ${items.length} boards → ${fname}.${kind === 'pdf' ? 'pdf' : 'zip'}`);
     } catch (err) {
       toast.err(`Export failed: ${String((err as Error)?.message ?? err)}`);
     } finally {
@@ -226,15 +272,6 @@ function DesignPage({ id }: { id: string }) {
             <button type="button" className="ox-icon-btn" title="Zoom in" onClick={() => vp.zoomBy(1.2)}><Icon name="plus" /></button>
           </div>
 
-          {scenes.length > 1 && (
-            <SelectMenu
-              label="Active board"
-              value={activeBoard}
-              options={scenes.map((s, i) => ({ value: i, label: s.label ?? s.id ?? `Board ${i + 1}` }))}
-              onChange={setActiveBoard}
-            />
-          )}
-
           {isDev && (
             <button type="button" className={`ox-btn${inspect ? ' ox-btn--active' : ''}`} aria-pressed={inspect} onClick={() => setInspect((v) => !v)}>
               {inspect ? 'Editing' : 'Edit'}
@@ -252,11 +289,25 @@ function DesignPage({ id }: { id: string }) {
             align="end"
             triggerClassName="ox-btn ox-btn--primary"
             button={exporting ? `Exporting ${exporting.toUpperCase()}…` : <>Export <Icon name="caret" size={14} /></>}
-            items={[
-              ...(config.build.allowPngDownload ? [{ label: 'PNG', disabled: !!exporting, onSelect: () => doExport('png') }] : []),
-              ...(config.build.allowSvgDownload ? [{ label: 'SVG', disabled: !!exporting, onSelect: () => doExport('svg') }] : []),
-              ...(config.build.allowPdfDownload ? [{ label: 'PDF', disabled: !!exporting, onSelect: () => doExport('pdf') }] : []),
-            ]}
+            items={(() => {
+              const multi = scenes.length > 1;
+              // Multi-board: name the current board in each item (the export
+              // targets the active board only) and offer all-board bundles.
+              const current = multi ? ` — ${boardName(activeBoard)}` : '';
+              const one = [
+                ...(config.build.allowPngDownload ? [{ label: `PNG${current}`, disabled: !!exporting, onSelect: () => doExport('png') }] : []),
+                ...(config.build.allowSvgDownload ? [{ label: `SVG${current}`, disabled: !!exporting, onSelect: () => doExport('svg') }] : []),
+                ...(config.build.allowPdfDownload ? [{ label: `PDF${current}`, disabled: !!exporting, onSelect: () => doExport('pdf') }] : []),
+              ];
+              const all = multi
+                ? [
+                    ...(config.build.allowPdfDownload ? [{ label: 'PDF — all boards', disabled: !!exporting, onSelect: () => doExportAll('pdf') }] : []),
+                    ...(config.build.allowPngDownload ? [{ label: 'PNG — all boards (.zip)', disabled: !!exporting, onSelect: () => doExportAll('png') }] : []),
+                    ...(config.build.allowSvgDownload ? [{ label: 'SVG — all boards (.zip)', disabled: !!exporting, onSelect: () => doExportAll('svg') }] : []),
+                  ]
+                : [];
+              return one.length && all.length ? [...one, { separator: true as const }, ...all] : [...one, ...all];
+            })()}
           />
         </header>
       )}
@@ -267,7 +318,7 @@ function DesignPage({ id }: { id: string }) {
             scenes={scenes}
             designKey={id}
             activeBoard={activeBoard}
-            onFocusBoard={(i) => { setActiveBoard(i); vp.fit(); }}
+            onFocusBoard={focusBoard}
             design={design}
             moduleArtboard={mod.artboard}
             selectedEl={selectedEl}
