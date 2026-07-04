@@ -1800,9 +1800,16 @@ code {
 .ox-dd-list {
   max-height: min(60vh, 380px);
   overflow-y: auto;
+  /* Labels can carry user content (board names in the Export menu) — cap the
+     popover and ellipsize instead of stretching across the viewport. */
+  max-width: min(90vw, 320px);
 }
 .ox-dd-label {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .ox-dd-tick {
   flex: 0 0 auto;

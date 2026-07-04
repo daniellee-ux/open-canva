@@ -84,7 +84,10 @@ export async function createViteConfig(opts: CreateViteConfigOptions): Promise<I
       // the dep scanner can miss react-dom/client and serve it as raw CJS — then
       // `import { createRoot } from 'react-dom/client'` throws "does not provide
       // an export named 'createRoot'" and the app never mounts (blank page).
-      include: ['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime', 'react/jsx-dev-runtime'],
+      include: ['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime', 'react/jsx-dev-runtime',
+        // Lazily imported by the export pipeline — pre-bundle so the first
+        // export doesn't trigger a mid-session "new dependency" page reload.
+        'jspdf', 'fflate'],
       // Virtual modules must not be pre-bundled.
       exclude: ['virtual:opencanva/designs', 'virtual:opencanva/config'],
     },

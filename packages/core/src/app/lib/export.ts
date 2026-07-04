@@ -193,16 +193,51 @@ export async function boardToPngDataUrl(board: HTMLElement, w: number, h: number
   });
 }
 
+/** One board of a multi-board export: the mounted element, its artboard size,
+ *  and the per-file name used for zip entries (e.g. "01-cover"). */
+export interface BoardExportItem {
+  el: HTMLElement;
+  w: number;
+  h: number;
+  name: string;
+}
+
 export async function exportPdf(board: HTMLElement, w: number, h: number, filename: string) {
-  const blob = await rasterize(board, w, h, 2);
-  const dataUrl = await new Promise<string>((resolve, reject) => {
-    const fr = new FileReader();
-    fr.onload = () => resolve(fr.result as string);
-    fr.onerror = reject;
-    fr.readAsDataURL(blob);
-  });
+  await exportPdfPages([{ el: board, w, h, name: filename }], filename);
+}
+
+/** All boards as one PDF, one page per board (pages keep each board's size). */
+export async function exportPdfPages(items: BoardExportItem[], filename: string) {
   const { jsPDF } = await import('jspdf');
-  const pdf = new jsPDF({ orientation: w >= h ? 'landscape' : 'portrait', unit: 'px', format: [w, h] });
-  pdf.addImage(dataUrl, 'PNG', 0, 0, w, h);
+  let pdf: InstanceType<typeof jsPDF> | null = null;
+  // Sequential on purpose: one offscreen raster at a time bounds memory.
+  for (const it of items) {
+    const dataUrl = await boardToPngDataUrl(it.el, it.w, it.h, 2);
+    const orientation = it.w >= it.h ? ('landscape' as const) : ('portrait' as const);
+    // compress + FAST deflate the embedded rasters — without them jsPDF stores
+    // raw pixels (~14 MB per 1080² page).
+    if (!pdf) pdf = new jsPDF({ orientation, unit: 'px', format: [it.w, it.h], compress: true });
+    else pdf.addPage([it.w, it.h], orientation);
+    pdf.addImage(dataUrl, 'PNG', 0, 0, it.w, it.h, undefined, 'FAST');
+  }
+  if (!pdf) throw new Error('Nothing to export');
   pdf.save(`${filename}.pdf`);
+}
+
+/** All boards as one .zip of standalone .png / .svg files. */
+export async function exportZip(items: BoardExportItem[], filename: string, kind: 'png' | 'svg') {
+  const { zipSync, strToU8 } = await import('fflate');
+  const entries: Record<string, [Uint8Array, { level: 0 | 6 }]> = {};
+  for (const it of items) {
+    if (kind === 'png') {
+      const blob = await rasterize(it.el, it.w, it.h, 2);
+      // PNG bytes are already deflated — store them instead of re-compressing.
+      entries[`${it.name}.png`] = [new Uint8Array(await blob.arrayBuffer()), { level: 0 }];
+    } else {
+      const svg = await buildBoardSvg(it.el, it.w, it.h, true);
+      entries[`${it.name}.svg`] = [strToU8(svg), { level: 6 }];
+    }
+  }
+  const zipped = zipSync(entries);
+  download(`${filename}.zip`, new Blob([zipped], { type: 'application/zip' }));
 }
