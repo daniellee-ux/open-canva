@@ -640,6 +640,7 @@ export function ThemesPage() {
               </div>
               <div className="ox-theme-name">
                 {name}
+                {d.vibe ? <span className="ox-theme-vibe">{d.vibe}</span> : null}
                 <code>theme: '{name}'</code>
               </div>
             </a>
@@ -719,6 +720,21 @@ export function ThemeDetail({ id }: { id: string }) {
         </div>
 
         <div className="ox-theme-tokens">
+          {(d.vibe || d.tags?.length) && (
+            <div className="ox-theme-tokens-group">
+              <div className="ox-theme-tokens-label">Style</div>
+              {d.vibe && <p className="ox-theme-vibe-detail">{d.vibe}</p>}
+              {d.tags?.length ? (
+                <div className="ox-theme-tag-row">
+                  {d.tags.map((t) => (
+                    <span key={t} className="ox-theme-tag">
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          )}
           <div className="ox-theme-tokens-group">
             <div className="ox-theme-tokens-label">Palette</div>
             {swatches.map(([label, key]) => (

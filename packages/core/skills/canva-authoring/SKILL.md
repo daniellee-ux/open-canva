@@ -44,7 +44,7 @@ export default [Poster] satisfies Scene[];
   - `Scene.label` — human name shown in the board switcher. **Never `Scene.name`** — `Function.name` is a read-only built-in and assigning to it throws.
   - `Scene.artboard` — per-scene size override (e.g. one story board among square boards).
 - `export const artboard: Artboard = { w, h, background? }` — the default size for every scene. Use a preset size (see below). Omit `background` to inherit the theme's `--ox-bg`; set it (a color or gradient) to override.
-- `export const meta: DesignMeta` — `title`, optional `theme` (a preset name), and a **quoted ISO 8601 `createdAt`** (run `node -e "console.log(new Date().toISOString())"`; never type it from memory).
+- `export const meta: DesignMeta` — `title`, optional `theme` (a preset name — the `create-design` skill's theme catalog describes each one), and a **quoted ISO 8601 `createdAt`** (run `node -e "console.log(new Date().toISOString())"`; never type it from memory).
 - Optional: `export const design: DesignSystem` to fully customize tokens instead of using a named `theme`.
 
 ### Artboard sizes
