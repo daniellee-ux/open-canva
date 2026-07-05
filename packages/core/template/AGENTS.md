@@ -16,7 +16,7 @@ npm run sync     # re-copy the bundled agent skills — run after a fresh clone 
 
 ## Authoring designs — read the skills first
 
-The authoring know-how ships as **Agent Skills** under `.agents/skills/` (and `.claude/skills/`). Before writing or editing anything under `designs/`, read **`.agents/skills/canva-authoring/SKILL.md`** — it's the source of truth for the file contract, the object primitives, the coordinate system, the design tokens, and the inspector-compatibility rules. Use **`create-design`** to make a new graphic, **`create-theme`** for a new palette, **`apply-comments`** to process inspector markers, **`current-design`** to resolve "this design".
+The authoring know-how ships as **Agent Skills** under `.agents/skills/` (and `.claude/skills/`). Before writing or editing anything under `designs/`, read **`.agents/skills/canva-authoring/SKILL.md`** — it's the source of truth for the file contract, the object primitives, the coordinate system, the design tokens, and the inspector-compatibility rules. Use **`create-design`** to make a new graphic, **`create-theme`** for a new palette, **`apply-comments`** to process inspector markers, **`current-design`** to resolve "this design", **`svg-illustration`** before drawing any hand-authored SVG illustration.
 
 ## Hard rules (these break the editor silently if violated)
 

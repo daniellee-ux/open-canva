@@ -343,14 +343,14 @@ export function Group({ children, className, ...p }: GroupProps) {
 /* -------------------------------------------------------------------------- */
 
 export interface IconProps extends ObjectProps {
-  /** An emoji or single glyph, or pass SVG/markup as children. */
+  /** An emoji or single glyph, or a small custom SVG mark as children. For a full illustration, use `<Illustration>` instead. */
   glyph?: string;
   size?: number;
   color?: string;
   children?: ReactNode;
 }
 
-/** A simple glyph/emoji or inline-SVG object. */
+/** A simple glyph/emoji or small custom-SVG mark. For a full illustration, use `<Illustration>` — its Inspector behavior (text edit, color swatch) isn't tuned for larger SVG content. */
 export function Icon({ glyph, size = 64, color, children, className, ...p }: IconProps) {
   return (
     <div
@@ -366,6 +366,33 @@ export function Icon({ glyph, size = 64, color, children, className, ...p }: Ico
       })}
     >
       {children ?? glyph}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+
+export interface IllustrationProps extends ObjectProps {
+  /** Optional background paint behind the SVG (e.g. a card color) — usually omitted for a transparent host. */
+  background?: string;
+  children?: ReactNode;
+}
+
+/** A full-bleed host for hand-authored inline SVG illustrations. */
+export function Illustration({ background, children, className, ...p }: IllustrationProps) {
+  return (
+    <div
+      {...objData(p, 'illustration')}
+      className={cn('ox-obj ox-illustration', className)}
+      style={objStyle(p, {
+        background,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+      })}
+    >
+      {children}
     </div>
   );
 }

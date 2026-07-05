@@ -37,6 +37,9 @@ const TYPE_ICON: Record<string, IconName> = {
   image: 'image',
   group: 'group',
   icon: 'spark',
+  // Reuses the closest existing glyph rather than adding a bespoke one — a
+  // deliberate, acknowledged compromise, not a precise fit.
+  illustration: 'image',
 };
 
 export function LayersPanel({

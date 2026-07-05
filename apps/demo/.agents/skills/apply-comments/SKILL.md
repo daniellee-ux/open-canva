@@ -31,7 +31,7 @@ The comment text is the string after `@canva-comment:` (or the `data-ox-comment`
 ## Workflow
 
 1. **Collect** every marker with `grep` (above). Note the file, line, and the object each marker is attached to.
-2. **Apply edits bottom-up** — process markers in **descending line order within each file** so earlier edits don't shift later line numbers. For each: read the surrounding code, make the change the comment asks for (consult `canva-authoring` for how — adjust props like `x`/`y`/`w`/`h`/`size`/`fill`/`color`, swap a token, restructure objects), following the design's existing palette and style.
+2. **Apply edits bottom-up** — process markers in **descending line order within each file** so earlier edits don't shift later line numbers. For each: read the surrounding code, make the change the comment asks for (consult `canva-authoring` for how — adjust props like `x`/`y`/`w`/`h`/`size`/`fill`/`color`/`background`, swap a token, restructure objects), following the design's existing palette and style.
 3. **Remove the marker** you just satisfied — delete the `{/* @canva-comment: … */}` child or the `data-ox-comment="…"` attribute.
 4. **Verify none remain**:
    ```bash
