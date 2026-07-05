@@ -13,4 +13,5 @@ export {
   ImageObject,
   Group,
   Icon,
+  Illustration,
 } from './primitives';

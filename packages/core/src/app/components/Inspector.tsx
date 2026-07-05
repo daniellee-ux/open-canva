@@ -13,7 +13,7 @@ import { toast } from './ui/toast';
  *   - drag body         → op:'prop' { x, y }        (screen delta ÷ zoom → artboard px)
  *   - drag a handle     → op:'prop' { x, y, w, h }
  *   - drag rotate knob  → op:'prop' { rotate }
- *   - color / size / B  → op:'prop' { fill | color | size | weight }
+ *   - color / size / B  → op:'prop' { fill | color | background | size | weight }
  *   - front / back      → op:'prop' { z }
  *   - text box          → op:'text'
  *   - Delete            → op:'remove'
@@ -115,7 +115,7 @@ function resolveVar(el: HTMLElement, name: string): string {
 }
 
 /** The object's current fill/text color, as a hex the native picker can show. */
-function currentColorOf(el: HTMLElement, prop: 'color' | 'fill'): string {
+function currentColorOf(el: HTMLElement, prop: 'color' | 'fill' | 'background'): string {
   const cs = getComputedStyle(el);
   return rgbToHex(prop === 'color' ? cs.color : cs.backgroundColor);
 }
@@ -991,7 +991,16 @@ export function Inspector({
 
   /* ----- discrete edits ---------------------------------------------------- */
 
-  const fillProp = sel?.type === 'text' || sel?.type === 'line' || sel?.type === 'icon' ? 'color' : 'fill';
+  const fillProp =
+    sel?.type === 'text' || sel?.type === 'line' || sel?.type === 'icon'
+      ? 'color'
+      : sel?.type === 'illustration'
+        ? 'background'
+        : 'fill';
+  // Human-readable label for the swatch/toast/undo-history copy — "Background"
+  // for an Illustration's backdrop mat (a different concept from an object's own
+  // fill, worth its own word), otherwise the existing Color/Fill split.
+  const displayName = sel?.type === 'illustration' ? 'Background' : fillProp === 'color' ? 'Color' : 'Fill';
   // The object's current fill/text color, resolved each render from the live DOM.
   const currentColor = sel ? currentColorOf(sel.el, fillProp) : '#000000';
   // Keep the custom-color input mirroring the object's CURRENT color (e.g. after a
@@ -1005,8 +1014,8 @@ export function Inspector({
   }, [currentColor]);
 
   const setColor = useCallback(
-    (color: string) => void commitProps({ [fillProp]: color }, 'Color').then(() => flash({ kind: 'ok', msg: `${fillProp} → ${color}` })),
-    [commitProps, fillProp, flash],
+    (color: string) => void commitProps({ [fillProp]: color }, displayName).then(() => flash({ kind: 'ok', msg: `${displayName} → ${color}` })),
+    [commitProps, fillProp, displayName, flash],
   );
   // Live native-picker preview: paint the object immediately, commit to source on
   // a short idle so dragging the OS color panel doesn't spam writes.
@@ -1018,9 +1027,9 @@ export function Inspector({
       if (fillProp === 'color') s.el.style.color = color;
       else s.el.style.background = color;
       if (colorTimer.current) clearTimeout(colorTimer.current);
-      colorTimer.current = setTimeout(() => void commitProps({ [fillProp]: color }, 'Color'), 220);
+      colorTimer.current = setTimeout(() => void commitProps({ [fillProp]: color }, displayName), 220);
     },
-    [fillProp, commitProps],
+    [fillProp, displayName, commitProps],
   );
   // Cancel pending debounced edits (slider/zoom typeTimers, color picker) when
   // leaving edit mode, switching designs, or unmounting — each captured its target
@@ -1270,7 +1279,7 @@ export function Inspector({
   // (computed backgroundColor reads rgba(0,0,0,0)) — don't pretend it's #000000.
   const fillIndeterminate =
     !!sel &&
-    fillProp === 'fill' &&
+    (fillProp === 'fill' || fillProp === 'background') &&
     (() => {
       const cs = getComputedStyle(sel.el);
       return cs.backgroundImage !== 'none' || /,\s*0\)\s*$/.test(cs.backgroundColor);
@@ -1539,7 +1548,7 @@ export function Inspector({
               </>
             ) : null}
 
-            <label className="ox-pop-label">{fillProp === 'color' ? 'Color' : 'Fill'}</label>
+            <label className="ox-pop-label">{displayName}</label>
             <div className="ox-swatches">
               {swatchColors.map((s, i) => {
                 const selected = i === selectedSwatchIdx;
@@ -1549,7 +1558,7 @@ export function Inspector({
                     type="button"
                     className={`ox-swatch${selected ? ' is-selected' : ''}`}
                     title={s.token}
-                    aria-label={`${fillProp === 'color' ? 'Text color' : 'Fill'}: ${s.token}`}
+                    aria-label={`${sel?.type === 'illustration' ? 'Background' : fillProp === 'color' ? 'Text color' : 'Fill'}: ${s.token}`}
                     aria-pressed={selected}
                     style={{ background: s.color }}
                     onClick={() => setColor(s.token)}

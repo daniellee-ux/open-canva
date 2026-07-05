@@ -73,7 +73,8 @@ Every object takes `x, y` (position), `w, h` (size), and optional `rotate` (deg,
 | `<Line>` | `w` (length), `thickness`, `color`, `dash`, `rotate` | Dividers, rules, accents. |
 | `<ImageObject>` | `src`, `fit` (`cover`\|`contain`), `radius` | Photos/logos. Put files in `designs/<id>/assets/` and use `src="./assets/photo.jpg"`. |
 | `<Group>` | (position only) | A transparent container for a **logical unit** (a card's parts, a labelled stat, a header cluster). Move/resize/rotate it as one object; the editor can select it as a unit, and multi-select → **Group**/**Ungroup** wraps or dissolves one. Children position **relative to the group**. |
-| `<Icon>` | `glyph` (emoji/char), `size`, `color` | Emoji or a single glyph. Pass SVG as children for custom marks. |
+| `<Icon>` | `glyph` (emoji/char), `size`, `color` | Emoji or a single glyph, or a small custom SVG mark as children — legacy for anything larger. |
+| `<Illustration>` | `background` (mat color behind the SVG) | A full-bleed host for a hand-authored inline SVG illustration. Read the **`svg-illustration`** skill before using this. |
 
 ## Authoring rules (these keep the inspector working)
 

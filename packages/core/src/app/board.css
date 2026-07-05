@@ -28,6 +28,15 @@
   user-select: none;
 }
 
+/* Makes the correct sizing the default rather than something the author has to
+   remember as an attribute on the inner <svg> — belt-and-suspenders with the
+   width="100%" height="100%" the svg-illustration skill also teaches. */
+.ox-illustration > svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
 /* Editor-only peek highlight (stripped before export). */
 .ox-peek {
   outline: 2px solid #5a9bf0 !important;
