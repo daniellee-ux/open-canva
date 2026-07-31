@@ -8,7 +8,9 @@ import type { DesignSystem } from './design';
  *
  * Most designs have a single Scene (one poster / one social post). Multiple
  * Scenes form a carousel / multi-board set (e.g. an Instagram carousel or size
- * variations), laid out side by side on the infinite canvas.
+ * variations), auto-arranged on the infinite canvas — a single row by default,
+ * or a vertical stack / wrapped grid via `export const layout` (see
+ * `BoardLayout`).
  *
  * Scene metadata lives as static properties on the component (like open-slide's
  * `Page.transition`); `Stage` reads them at render time.
@@ -21,6 +23,13 @@ export type Scene = FC & {
   label?: string;
   /** Per-scene artboard size, overriding the module-level `artboard`. */
   artboard?: Artboard;
+  /**
+   * Start a new line at this board — a new row in `row` direction, a new column
+   * in `column` direction. The local way to stack: leave the module `layout`
+   * alone and set `NewVersion.break = true` to drop this board (and everything
+   * after it) onto the next row. Ignored on the first scene.
+   */
+  break?: boolean;
 };
 
 export interface DesignMeta {
@@ -45,12 +54,50 @@ export interface Artboard {
   background?: string;
 }
 
+/**
+ * How multiple Scenes are arranged on the canvas. Boards auto-flow along one
+ * axis and wrap onto new lines, so a design can be one row (the default), a
+ * vertical stack, or a grid — e.g. six versions in a row with a seventh
+ * directly beneath them.
+ *
+ * Boards never overlap: each line is sized by its tallest (or widest) board.
+ */
+export interface BoardLayout {
+  /**
+   * Flow axis. `'row'` (default) runs boards left→right; `'column'` stacks them
+   * top→bottom.
+   */
+  direction?: 'row' | 'column';
+  /**
+   * Wrap onto a new line after this many boards — boards per row in `row`
+   * direction, boards per column in `column` direction. Omit for one unbroken
+   * line. A scene's own `break` starts a new line regardless.
+   */
+  wrap?: number;
+  /** Gap along the flow axis, in artboard px. Default 96. */
+  gap?: number;
+  /** Gap across the flow axis — between rows (or columns). Defaults to `gap`. */
+  crossGap?: number;
+  /**
+   * How boards of unequal size sit across the flow axis within their line —
+   * e.g. a short board among tall ones in a row. Default `'center'`.
+   */
+  align?: 'start' | 'center' | 'end';
+  /**
+   * How a short line sits along the flow axis relative to the longest one —
+   * e.g. a single board under a row of six. Default `'start'`.
+   */
+  justify?: 'start' | 'center' | 'end';
+}
+
 export interface DesignModule {
   default: Scene[];
   meta?: DesignMeta;
   design?: DesignSystem;
   /** Default artboard size for every scene that doesn't set its own. */
   artboard?: Artboard;
+  /** Multi-board arrangement on the canvas. Default: a single horizontal row. */
+  layout?: BoardLayout;
 }
 
 /**

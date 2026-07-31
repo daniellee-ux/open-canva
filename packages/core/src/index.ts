@@ -1,5 +1,5 @@
 // Public API of @opencanva/core — what designs under designs/<id>/ import.
-export type { Scene, DesignMeta, DesignModule, Artboard } from './sdk';
+export type { Scene, DesignMeta, DesignModule, Artboard, BoardLayout } from './sdk';
 export { DEFAULT_ARTBOARD, artboardPresets, resolveArtboard } from './sdk';
 export type { DesignSystem } from './design';
 export { defaultDesign, designPresets, designToCssVars, resolveDesign } from './design';

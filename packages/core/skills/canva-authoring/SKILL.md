@@ -38,11 +38,12 @@ export const meta: DesignMeta = { title: 'My poster', theme: 'sunset', createdAt
 export default [Poster] satisfies Scene[];
 ```
 
-- `export default` is a **non-empty array of zero-prop React components** (`Scene[]`), one per **artboard**, in order. Most designs have a single Scene; multiple Scenes form a carousel / multi-board set (laid side by side on the canvas).
+- `export default` is a **non-empty array of zero-prop React components** (`Scene[]`), one per **artboard**, in order. Most designs have a single Scene; multiple Scenes form a carousel / multi-board set (auto-arranged on the canvas — one row by default, or a stack / grid, see **Arranging multiple boards**).
 - Scene metadata is set as **static properties** on the component:
   - `Scene.id` — stable id for the layers panel + deep links. Always set it.
   - `Scene.label` — human name shown in the board switcher. **Never `Scene.name`** — `Function.name` is a read-only built-in and assigning to it throws.
   - `Scene.artboard` — per-scene size override (e.g. one story board among square boards).
+  - `Scene.break` — start a new row (or column) at this board. See below.
 - `export const artboard: Artboard = { w, h, background? }` — the default size for every scene. Use a preset size (see below). Omit `background` to inherit the theme's `--ox-bg`; set it (a color or gradient) to override.
 - `export const meta: DesignMeta` — `title`, optional `theme` (a preset name — the `create-design` skill's theme catalog describes each one), and a **quoted ISO 8601 `createdAt`** (run `node -e "console.log(new Date().toISOString())"`; never type it from memory).
 - Optional: `export const design: DesignSystem` to fully customize tokens instead of using a named `theme`.
@@ -60,6 +61,40 @@ Import `artboardPresets` or just write the numbers. Common sizes:
 | `presentation-16x9` | 1920 × 1080 | Slides / banners |
 | `poster-a4-portrait` | 1240 × 1754 | Print posters |
 | `business-card` | 1050 × 600 | Cards |
+
+## Arranging multiple boards
+
+Boards **auto-flow** on the canvas — by default a single horizontal row, left to right in `export default` order. `export const layout: BoardLayout` changes that, so a set can be a vertical stack or a grid (e.g. six versions in a row with a new version directly beneath them). You never position boards in pixels; you pick the flow and where it wraps.
+
+```tsx
+import type { BoardLayout } from '@opencanva/core';
+
+export const layout: BoardLayout = { wrap: 3 };            // grid: 3 per row, wrapping downward
+// { direction: 'column' }                                  // one vertical stack, top → bottom
+// { direction: 'column', wrap: 4 }                         // 4 per column, wrapping rightward
+// { wrap: 6, justify: 'center', crossGap: 200 }            // 6 per row; short rows centered, roomier row gap
+```
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `direction` | `'row'` | Flow axis: `'row'` runs left→right, `'column'` stacks top→bottom. |
+| `wrap` | none | Wrap onto a new line after N boards — boards per row (`row`) / per column (`column`). |
+| `gap` | `96` | Gap along the flow axis, in artboard px. |
+| `crossGap` | `gap` | Gap between rows (or columns). |
+| `align` | `'center'` | How boards of unequal size sit **across** the flow axis inside their line (a short board among tall ones). `start` \| `center` \| `end`. |
+| `justify` | `'start'` | How a **short line** sits along the flow axis relative to the longest one (one board under a row of six). `start` \| `center` \| `end`. |
+
+To stack **without** touching the module layout, set `break` on the scene that should start the next line — the local, additive move when adding a new version below an existing row:
+
+```tsx
+const V7: Scene = () => (/* … */);
+V7.id = 'v7';
+V7.label = 'V7 — new version';
+V7.break = true;                    // V7 (and everything after it) drops to the next row
+export default [V1, V2, V3, V4, V5, V6, V7] satisfies Scene[];
+```
+
+Boards never overlap: each line is sized by its tallest (row) / widest (column) board. Board order in `export default` stays the export order and the layers-panel order regardless of arrangement.
 
 ## Object primitive kit (import from `@opencanva/core`)
 
