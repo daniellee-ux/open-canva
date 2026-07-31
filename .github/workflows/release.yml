@@ -1,0 +1,72 @@
+name: Release
+
+# Publishes both packages to npm with **trusted publishing** (OIDC) — no npm
+# token, no 2FA OTP. npmjs.com must have a Trusted Publisher configured for
+# @opencanva/core AND create-opencanva, both pointing at this repo and this
+# exact workflow filename (release.yml).
+#
+# Trigger by pushing a version tag cut from main:  git tag v0.4.0 && git push origin v0.4.0
+# (workflow_dispatch is there to re-run a half-finished release without re-tagging.)
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      # OIDC token for trusted publishing — without this npm falls back to
+      # token auth and the publish fails.
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          # Trusted publishing needs Node >= 22.14.0.
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      - name: Upgrade npm
+        # Node 22 ships npm 10.x; trusted publishing needs npm >= 11.5.1.
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Publishing is irreversible — re-run the same gates CI runs on main
+      # rather than trusting that the tag points at a green commit.
+      - name: Typecheck (core)
+        run: npm run typecheck
+
+      - name: Typecheck (demo)
+        run: npx tsc --noEmit -p apps/demo
+
+      - name: Check committed skills/template/lockfile are in sync
+        run: npm run check:sync
+
+      - name: Check the tag matches the package versions
+        run: node scripts/check-release-versions.mjs "${{ github.ref_type == 'tag' && github.ref_name || '' }}"
+
+      # Order matters: create-opencanva depends on @opencanva/core with a caret
+      # range, so the wrapper must not go out as `latest` before the core
+      # version it pins is resolvable — `npm create opencanva@latest` would fail
+      # with ETARGET. Publish core, wait for the registry, then the wrapper.
+      - name: Publish @opencanva/core
+        run: node scripts/publish-if-needed.mjs @opencanva/core
+
+      - name: Wait for @opencanva/core on the registry
+        run: node scripts/wait-for-registry.mjs @opencanva/core
+
+      - name: Publish create-opencanva
+        run: node scripts/publish-if-needed.mjs create-opencanva
