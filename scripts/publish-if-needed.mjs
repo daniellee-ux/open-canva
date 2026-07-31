@@ -40,5 +40,11 @@ if (live === version) {
 }
 
 console.log(`→ publishing ${name}@${version} …`);
-execFileSync('npm', ['publish', '-w', name, '--access', 'public'], { cwd: ROOT, stdio: 'inherit' });
+// --provenance is documented as implicit under trusted publishing, but reports of
+// it NOT being applied are common enough that passing it explicitly is cheaper
+// than a failed release. It needs package.json `repository` to match this repo.
+execFileSync('npm', ['publish', '-w', name, '--access', 'public', '--provenance'], {
+  cwd: ROOT,
+  stdio: 'inherit',
+});
 console.log(`✓ published ${name}@${version}`);
