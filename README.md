@@ -56,7 +56,7 @@ export const meta: DesignMeta = { title: 'My poster', theme: 'sunset', createdAt
 export default [Poster] satisfies Scene[];
 ```
 
-- `export default` is `Scene[]` — one component per artboard (most designs have one; several = a carousel / size set).
+- `export default` is `Scene[]` — one component per artboard (most designs have one; several = a carousel / size set). Multiple boards flow in a row by default; `export const layout` (`{ wrap: 3 }`, `{ direction: 'column' }`) or a scene's `break` arranges them as a grid or a vertical stack.
 - Objects: `<Box>`, `<Text>`, `<Ellipse>`, `<Line>`, `<ImageObject>`, `<Group>`, `<Icon>`, `<Illustration>` — positioned with `x/y/w/h`, rotated with `rotate`, themed with `var(--ox-*)` tokens.
 - Themes: `ember`, `noir`, `sunset`, `mint`, `blueprint`, `bubblegum` (see `/themes`), or roll your own `DesignSystem`.
 

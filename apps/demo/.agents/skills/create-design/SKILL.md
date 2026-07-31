@@ -94,7 +94,7 @@ Also decide the **logical structure**: which objects form self-contained units (
 
 Read **`canva-authoring`** first, then write. Place objects with literal pixel coordinates; use `var(--ox-*)` tokens for color so the theme drives the palette. Add `export const artboard`, and `export const meta` with `title`, `theme`, and a real `createdAt` (run `node -e "console.log(new Date().toISOString())"`).
 
-For a carousel/multi-board, export several Scenes; give each an `id` and `label`.
+For a carousel/multi-board, export several Scenes; give each an `id` and `label`. They land in one row by default — add `export const layout` (`{ wrap: 3 }` for a grid, `{ direction: 'column' }` for a vertical stack) or set `break` on a scene to start a new row, e.g. when adding a new version beneath an existing row of boards. See "Arranging multiple boards" in `canva-authoring`.
 
 ## Step 5 — Self-review
 

@@ -97,7 +97,7 @@ function DesignPage({ id }: { id: string }) {
   const scenes = mod?.default ?? [];
   const title = mod?.meta?.title ?? id;
   const design = useMemo(() => resolveDesign({ design: mod?.design, theme: mod?.meta?.theme }), [mod]);
-  const layout = useMemo(() => layoutBoards(scenes, mod?.artboard), [scenes, mod]);
+  const layout = useMemo(() => layoutBoards(scenes, mod?.artboard, mod?.layout), [scenes, mod]);
   const vp = useViewport(stageRef, { w: layout.w, h: layout.h });
 
   // Focus a board: make it active (toolbar, layers panel) AND bring it into
@@ -329,6 +329,7 @@ function DesignPage({ id }: { id: string }) {
           canvasRef={canvasRef}
           scenes={scenes}
           moduleArtboard={mod.artboard}
+          layout={mod.layout}
           design={design}
           viewport={vp}
         />
