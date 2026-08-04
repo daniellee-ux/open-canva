@@ -7,6 +7,14 @@ description: Use this skill when the user wants to create, draft, design, or gen
 
 This skill owns the **workflow** for making a new graphic. The technical reference — file contract, object primitives, coordinate system, design tokens — lives in the **`canva-authoring`** skill. Read that before writing code. You only write files under `designs/<id>/`; never modify `package.json`, `opencanva.config.ts`, or other designs.
 
+## Step 0 — Build the marketing message when needed
+
+If the graphic must earn clicks, reading, saves, or shares—a social post, ad, campaign carousel, launch graphic, cover, or thumbnail—read **`write-marketing-copy`** first and turn the user's source into a `ContentPack`. Settle the audience, one truthful promise, title, cover copy, body/board outline, proof, and CTA before composing the visual.
+
+If the first board is a cover or thumbnail and its focal image is not locked, read **`select-marketing-image`** and settle an `ImageSelectionPack`. Then read **`design-marketing-cover`** for the stop/click strategy, cover copy tests, layout pattern, and thumbnail audit. This skill still owns the OpenCanva creation workflow.
+
+Skip this branch for graphics whose purpose is purely decorative or where the user has already locked the exact copy and cover direction.
+
 ## Step 1 — Clarify the brief (ask before designing)
 
 Use `AskUserQuestion` to lock in, unless the user's message already answers them:

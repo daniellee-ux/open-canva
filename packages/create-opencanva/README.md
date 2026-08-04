@@ -20,9 +20,10 @@ The scaffold drops a ready-to-run project into the target directory:
 - **`designs/start-here/`** — a starter design to open and learn from
 - **`opencanva.config.ts`** + **`tsconfig.json`** — preconfigured
 - **`AGENTS.md`** (+ a byte-identical `CLAUDE.md` copy) — the cross-tool repo guide
-- **`.agents/skills/`** and **`.claude/skills/`** — the six authoring skills
-  (`canva-authoring`, `create-design`, `apply-comments`, `current-design`,
-  `create-theme`, `svg-illustration`) so Claude Code, Codex, Cursor, … can author for you out of the box
+- **`.agents/skills/`** and **`.claude/skills/`** — the nine authoring skills
+  (`canva-authoring`, `create-design`, `write-marketing-copy`, `select-marketing-image`,
+  `design-marketing-cover`, `apply-comments`, `current-design`, `create-theme`, `svg-illustration`) so Claude Code,
+  Codex, Cursor, … can author marketing-ready graphics for you out of the box
 - **`@opencanva/core`** pinned as a dependency
 
 Then `npm install && npm run dev`, open <http://localhost:5173>, and load a design at `/d/<id>`.

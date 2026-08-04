@@ -1,0 +1,4 @@
+interface:
+  display_name: "Select Marketing Image"
+  short_description: "Choose credible images that earn attention and fit the copy"
+  default_prompt: "Use $select-marketing-image to choose and crop the strongest image for my marketing content."

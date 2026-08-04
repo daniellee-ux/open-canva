@@ -1,0 +1,4 @@
+interface:
+  display_name: "Design Marketing Cover"
+  short_description: "Design clear, clickable covers that keep their promise"
+  default_prompt: "Use $design-marketing-cover to turn my content into a clickable, trustworthy social cover."
