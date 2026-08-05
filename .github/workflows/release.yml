@@ -5,7 +5,7 @@ name: Release
 # @opencanva/core AND create-opencanva, both pointing at this repo and this
 # exact workflow filename (release.yml).
 #
-# Trigger by pushing a version tag cut from main:  git tag v0.4.0 && git push origin v0.4.0
+# Trigger by pushing a version tag cut from main:  git tag v0.5.0 && git push origin v0.5.0
 # (workflow_dispatch is there to re-run a half-finished release without re-tagging.)
 
 on:
