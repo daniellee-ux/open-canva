@@ -17,7 +17,7 @@ npm run typecheck    # tsc --noEmit on @opencanva/core
 ```
 
 - The demo app runs the CLI directly: `opencanva <dev|build|preview|sync|init>` (defaults to `dev`). Regenerate the committed skills with **`npm run sync`** (it runs in `apps/demo`); bare `opencanva sync` inside this monorepo is refused (it would write a stray skills tree).
-- `npm run sync` copies the skills bundled in `packages/core/skills/` into the demo workspace's **`.agents/skills/`** (vendor-neutral, committed) **and `.claude/skills/`** (Claude-specific, git-ignored): `canva-authoring`, `create-design`, `apply-comments`, `current-design`, `create-theme`, `svg-illustration`.
+- `npm run sync` copies the skills bundled in `packages/core/skills/` into the demo workspace's **`.agents/skills/`** (vendor-neutral, committed) **and `.claude/skills/`** (Claude-specific, git-ignored): `canva-authoring`, `create-design`, `write-marketing-copy`, `select-marketing-image`, `design-marketing-cover`, `apply-comments`, `current-design`, `create-theme`, `svg-illustration`.
 - `opencanva init [dir]` scaffolds a fresh OpenCanva project (config, starter design, and both skill dirs) so a new project is multi-agent ready out of the box.
 - After changing `designPresets` in `packages/core/src/design.ts` (every preset needs `vibe` + `tags`), run **`npm run gen:catalog && npm run sync`** — it regenerates the theme catalog table inside the `create-design` skill from the presets; `check:sync` fails CI if the table is stale.
 - To typecheck the designs specifically: `npx tsc --noEmit -p apps/demo` (this is what CI runs alongside the core typecheck).
@@ -29,7 +29,7 @@ The authoring know-how ships as **Agent Skills** — `SKILL.md` files with YAML 
 
 (The repo-root `.agents/skills/` holds only `frontend-design` — a third-party design-quality skill vendored for work *on the framework*, tracked in `skills-lock.json`. It is intentionally not part of the bundle `sync`/`init` distribute.)
 
-- **Authoring graphics** (the common task): write/edit files under `designs/<id>/`. Read the **`canva-authoring`** skill first — it's the source of truth for the file contract, the object primitives, the coordinate system, and the inspector-compatibility rules. Use **`create-design`** for the new-graphic workflow, **`apply-comments`** to process inspector markers, **`current-design`** to resolve "this design".
+- **Authoring graphics** (the common task): write/edit files under `designs/<id>/`. Read the **`canva-authoring`** skill first — it's the source of truth for the file contract, the object primitives, the coordinate system, and the inspector-compatibility rules. Use **`create-design`** for the new-graphic workflow, **`write-marketing-copy`** to turn source material into a click/read/share content package, **`select-marketing-image`** to choose and crop the focal image, **`design-marketing-cover`** for cover composition, **`apply-comments`** to process inspector markers, and **`current-design`** to resolve "this design".
 - If your agent does not auto-discover skills, read `apps/demo/.agents/skills/canva-authoring/SKILL.md` directly before editing any design.
 
 ## Working in this repo
